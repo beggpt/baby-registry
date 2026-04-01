@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  name         String
+  dueDate      DateTime?
+  babyGender   String?    // "boy", "girl", "surprise"
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  lists        BabyList[]
+}
+
+model BabyList {
+  id          String     @id @default(cuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String     // npr. "Lista za Mateja"
+  description String?
+  shareSlug   String     @unique @default(cuid()) // javni URL
+  isPublic    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  items       ListItem[]
+}
+
+model ListItem {
+  id         String      @id @default(cuid())
+  listId     String
+  list       BabyList    @relation(fields: [listId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product     @relation(fields: [productId], references: [id])
+  priority   Priority    @default(MEDIUM)
+  note       String?     // privatna napomena mame
+  createdAt  DateTime    @default(now())
+
+  reservation Reservation?
+}
+
+model Reservation {
+  id            String      @id @default(cuid())
+  listItemId    String      @unique
+  listItem      ListItem    @relation(fields: [listItemId], references: [id], onDelete: Cascade)
+  reservedBy    String      // ime prijatelja koji rezervira
+  reservedAt    DateTime    @default(now())
+  status        ReservationStatus @default(RESERVED)
+  note          String?     // poruka za mamu
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  name      String
+  slug      String    @unique
+  parentId  String?
+  parent    Category? @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryTree")
+
+  products  Product[]
+}
+
+model Product {
+  id          String    @id @default(cuid())
+  name        String
+  description String?   @db.Text
+  price       Float
+  currency    String    @default("EUR")
+  imageUrl    String?
+  productUrl  String    // link do originala na shopu
+  sku         String?   // šifra proizvoda na shopu
+  inStock     Boolean   @default(true)
+  shopName    String    // "Baby Center"
+  shopSlug    String    // "babycenter"
+  categoryId  String?
+  category    Category? @relation(fields: [categoryId], references: [id])
+  lastScraped DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  listItems   ListItem[]
+}
+
+model ScrapedShop {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  baseUrl     String
+  isActive    Boolean   @default(true)
+  lastRun     DateTime?
+  lastStatus  String?   // "success", "error"
+  errorMsg    String?
+  productsCount Int     @default(0)
+  createdAt   DateTime  @default(now())
+}
+
+enum Priority {
+  HIGH    // jako želim
+  MEDIUM  // bilo bi lijepo
+  LOW     // luksuz
+}
+
+enum ReservationStatus {
+  RESERVED  // prijatelj je rezervirao
+  PURCHASED // kupljeno
+}

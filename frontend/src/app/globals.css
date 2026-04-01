@@ -1,0 +1,89 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --cream:     #FAF7F2;
+  --blush:     #F2D9D0;
+  --blush-mid: #E8B8A8;
+  --rose:      #C97B6B;
+  --sage:      #8BA888;
+  --sage-light:#D4E4D2;
+  --warm-gray: #6B6360;
+  --charcoal:  #2C2320;
+  --gold:      #C9A96E;
+  --white:     #FFFFFF;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--cream);
+  color: var(--charcoal);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-family: 'DM Serif Display', serif;
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--cream); }
+::-webkit-scrollbar-thumb { background: var(--blush-mid); border-radius: 3px; }
+
+/* Utility classes */
+.serif { font-family: 'DM Serif Display', serif; }
+.sans  { font-family: 'DM Sans', sans-serif; }
+
+/* Page fade-in */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fadeUp 0.5s ease-out forwards; }
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.fade-in { animation: fadeIn 0.4s ease-out forwards; }
+
+/* Shimmer loading */
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, #f0ebe4 25%, #faf5ef 50%, #f0ebe4 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Product card hover */
+.product-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.product-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(44, 35, 32, 0.1);
+}
+
+/* Priority badges */
+.priority-HIGH   { background: #FDE8E4; color: #B85C4A; }
+.priority-MEDIUM { background: #F0F3EE; color: #5C7A59; }
+.priority-LOW    { background: #F5F0E8; color: #8C7A56; }
+
+/* Status badges */
+.status-available { background: #EAF4EA; color: #3D7A3A; }
+.status-reserved  { background: #FEF3E2; color: #9A6B1A; }
+.status-purchased { background: #EAE8F4; color: #5A4E8A; }
