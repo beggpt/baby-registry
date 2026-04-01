@@ -7,16 +7,33 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Priority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum ReservationStatus {
+  RESERVED
+  PURCHASED
+}
+
 model User {
   id           String     @id @default(cuid())
   email        String     @unique
-  passwordHash String
+  passwordHash String?
+  googleId     String?    @unique
   name         String
   dueDate      DateTime?
-  babyGender   String?    // "boy", "girl", "surprise"
+  babyGender   String?
+  role         Role       @default(USER)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
-
   lists        BabyList[]
 }
 
@@ -24,91 +41,92 @@ model BabyList {
   id          String     @id @default(cuid())
   userId      String
   user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name        String     // npr. "Lista za Mateja"
+  name        String
+  occasion    String?    // "birth", "birthday", "baptism", "confirmation", "other"
   description String?
-  shareSlug   String     @unique @default(cuid()) // javni URL
+  shareSlug   String     @unique @default(cuid())
   isPublic    Boolean    @default(true)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
-
   items       ListItem[]
 }
 
 model ListItem {
-  id         String      @id @default(cuid())
-  listId     String
-  list       BabyList    @relation(fields: [listId], references: [id], onDelete: Cascade)
-  productId  String
-  product    Product     @relation(fields: [productId], references: [id])
-  priority   Priority    @default(MEDIUM)
-  note       String?     // privatna napomena mame
-  createdAt  DateTime    @default(now())
-
+  id          String       @id @default(cuid())
+  listId      String
+  list        BabyList     @relation(fields: [listId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product      @relation(fields: [productId], references: [id])
+  priority    Priority     @default(MEDIUM)
+  note        String?
+  createdAt   DateTime     @default(now())
   reservation Reservation?
 }
 
 model Reservation {
-  id            String      @id @default(cuid())
-  listItemId    String      @unique
-  listItem      ListItem    @relation(fields: [listItemId], references: [id], onDelete: Cascade)
-  reservedBy    String      // ime prijatelja koji rezervira
-  reservedAt    DateTime    @default(now())
-  status        ReservationStatus @default(RESERVED)
-  note          String?     // poruka za mamu
+  id          String            @id @default(cuid())
+  listItemId  String            @unique
+  listItem    ListItem          @relation(fields: [listItemId], references: [id], onDelete: Cascade)
+  reservedBy  String
+  reservedAt  DateTime          @default(now())
+  status      ReservationStatus @default(RESERVED)
+  note        String?
 }
 
 model Category {
-  id        String    @id @default(cuid())
+  id        String     @id @default(cuid())
   name      String
-  slug      String    @unique
+  slug      String     @unique
   parentId  String?
-  parent    Category? @relation("CategoryTree", fields: [parentId], references: [id])
+  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
   children  Category[] @relation("CategoryTree")
-
   products  Product[]
 }
 
 model Product {
-  id          String    @id @default(cuid())
-  name        String
-  description String?   @db.Text
-  price       Float
-  currency    String    @default("EUR")
-  imageUrl    String?
-  productUrl  String    // link do originala na shopu
-  sku         String?   // šifra proizvoda na shopu
-  inStock     Boolean   @default(true)
-  shopName    String    // "Baby Center"
-  shopSlug    String    // "babycenter"
-  categoryId  String?
-  category    Category? @relation(fields: [categoryId], references: [id])
-  lastScraped DateTime  @default(now())
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id               String            @id @default(cuid())
+  name             String
+  description      String?           @db.Text
+  price            Float
+  currency         String            @default("EUR")
+  imageUrl         String?
+  productUrl       String
+  sku              String?
+  inStock          Boolean           @default(true)
+  shopName         String
+  shopSlug         String
+  categoryId       String?
+  category         Category?         @relation(fields: [categoryId], references: [id])
+  lastScraped      DateTime          @default(now())
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  listItems        ListItem[]
+  featuredProducts FeaturedProduct[]
+}
 
-  listItems   ListItem[]
+model FeaturedProduct {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model AppSetting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String @db.Text
 }
 
 model ScrapedShop {
-  id          String    @id @default(cuid())
-  name        String
-  slug        String    @unique
-  baseUrl     String
-  isActive    Boolean   @default(true)
-  lastRun     DateTime?
-  lastStatus  String?   // "success", "error"
-  errorMsg    String?
-  productsCount Int     @default(0)
-  createdAt   DateTime  @default(now())
-}
-
-enum Priority {
-  HIGH    // jako želim
-  MEDIUM  // bilo bi lijepo
-  LOW     // luksuz
-}
-
-enum ReservationStatus {
-  RESERVED  // prijatelj je rezervirao
-  PURCHASED // kupljeno
+  id            String    @id @default(cuid())
+  name          String
+  slug          String    @unique
+  baseUrl       String
+  isActive      Boolean   @default(true)
+  lastRun       DateTime?
+  lastStatus    String?
+  errorMsg      String?
+  productsCount Int       @default(0)
+  createdAt     DateTime  @default(now())
 }

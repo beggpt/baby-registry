@@ -1,6 +1,8 @@
 export type Priority = 'HIGH' | 'MEDIUM' | 'LOW'
 export type ReservationStatus = 'RESERVED' | 'PURCHASED'
 export type BabyGender = 'boy' | 'girl' | 'surprise'
+export type Occasion = 'birth' | 'birthday' | 'baptism' | 'confirmation' | 'other'
+export type Role = 'USER' | 'ADMIN'
 
 export interface User {
   id: string
@@ -8,7 +10,8 @@ export interface User {
   name: string
   dueDate?: string
   babyGender?: BabyGender
-  createdAt: string
+  role: Role
+  createdAt?: string
 }
 
 export interface Category {
@@ -19,6 +22,7 @@ export interface Category {
   parent?: Category
   children?: Category[]
   _count?: { products: number }
+  totalCount?: number
 }
 
 export interface Product {
@@ -64,6 +68,7 @@ export interface BabyList {
   userId: string
   user?: Pick<User, 'name' | 'dueDate' | 'babyGender'>
   name: string
+  occasion?: Occasion
   description?: string
   shareSlug: string
   isPublic: boolean
@@ -75,10 +80,17 @@ export interface BabyList {
 
 export interface PaginatedProducts {
   products: Product[]
-  pagination: {
-    page: number
-    limit: number
-    total: number
-    totalPages: number
-  }
+  pagination: { page: number; limit: number; total: number; totalPages: number }
+  priceRange: { min: number; max: number }
+}
+
+export interface AdminUser {
+  id: string
+  email: string
+  name: string
+  role: Role
+  dueDate?: string
+  babyGender?: string
+  createdAt: string
+  _count: { lists: number }
 }

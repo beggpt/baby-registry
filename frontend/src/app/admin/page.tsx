@@ -1,96 +1,150 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
-import { adminApi } from '@/lib/api'
-import { RefreshCw, CheckCircle, XCircle, Clock, Package, Users, List, Gift } from 'lucide-react'
+import { adminApi, productsApi } from '@/lib/api'
+import { useAuthStore } from '@/lib/store'
+import { Product, AdminUser } from '@/types'
+import { RefreshCw, CheckCircle, XCircle, Clock, Package, Users, List, Gift, Search, Image, Star, StarOff, Shield } from 'lucide-react'
 import { format } from 'date-fns'
 import { hr } from 'date-fns/locale'
 import clsx from 'clsx'
 
-interface Shop {
-  id: string
-  name: string
-  slug: string
-  baseUrl: string
-  isActive: boolean
-  lastRun?: string
-  lastStatus?: string
-  errorMsg?: string
-  productsCount: number
-}
-
-interface Stats {
-  usersCount: number
-  listsCount: number
-  productsCount: number
-  reservationsCount: number
-}
+type Tab = 'overview' | 'users' | 'scraper' | 'featured' | 'settings'
 
 export default function AdminPage() {
-  const [shops, setShops] = useState<Shop[]>([])
-  const [stats, setStats] = useState<Stats | null>(null)
-  const [loading, setLoading] = useState(true)
+  const router = useRouter()
+  const { user, isLoading, loadFromStorage } = useAuthStore()
+  const [tab, setTab] = useState<Tab>('overview')
+  const [stats, setStats] = useState<any>(null)
+  const [shops, setShops] = useState<any[]>([])
+  const [users, setUsers] = useState<AdminUser[]>([])
+  const [usersTotal, setUsersTotal] = useState(0)
+  const [userPage, setUserPage] = useState(1)
+  const [userSearch, setUserSearch] = useState('')
+  const [featured, setFeatured] = useState<any[]>([])
+  const [settings, setSettings] = useState<Record<string, string>>({})
+  const [products, setProducts] = useState<Product[]>([])
+  const [productSearch, setProductSearch] = useState('')
   const [scraping, setScraping] = useState<Record<string, boolean>>({})
   const [toast, setToast] = useState<string | null>(null)
+  const [heroUrl, setHeroUrl] = useState('')
+  const [heroSaving, setHeroSaving] = useState(false)
 
-  const showToast = (msg: string) => {
-    setToast(msg)
-    setTimeout(() => setToast(null), 3000)
-  }
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000) }
 
-  const fetchData = async () => {
-    try {
-      const [shopsRes, statsRes] = await Promise.all([
-        adminApi.getShops(),
-        adminApi.getStats(),
-      ])
-      setShops(shopsRes.data)
-      setStats(statsRes.data)
-    } catch {
-    } finally {
-      setLoading(false)
-    }
-  }
+  useEffect(() => { loadFromStorage() }, [])
+  useEffect(() => {
+    if (!isLoading && user && user.role !== 'ADMIN') router.push('/')
+    if (!isLoading && !user) router.push('/prijava')
+  }, [user, isLoading])
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => {
+    adminApi.getStats().then(r => setStats(r.data)).catch(() => {})
+    adminApi.getShops().then(r => setShops(r.data)).catch(() => {})
+    adminApi.getFeatured().then(r => setFeatured(r.data)).catch(() => {})
+    adminApi.getSettings().then(r => { setSettings(r.data); setHeroUrl(r.data.heroImage || '') }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (tab !== 'users') return
+    adminApi.getUsers({ page: userPage, q: userSearch || undefined })
+      .then(r => { setUsers(r.data.users); setUsersTotal(r.data.total) }).catch(() => {})
+  }, [tab, userPage, userSearch])
+
+  useEffect(() => {
+    if (tab !== 'featured') return
+    productsApi.getAll({ q: productSearch || undefined, limit: 12 })
+      .then(r => setProducts(r.data.products)).catch(() => {})
+  }, [tab, productSearch])
 
   const handleScrape = async (slug: string) => {
     setScraping(p => ({ ...p, [slug]: true }))
     try {
       await adminApi.triggerScrape(slug)
-      showToast(`Scraping pokrenuti za ${slug}! Provjerite logove.`)
-      // Osvježi status nakon kratke pauze
-      setTimeout(fetchData, 3000)
-    } catch {
-      showToast('Greška pri pokretanju scrapera')
-    } finally {
-      setTimeout(() => setScraping(p => ({ ...p, [slug]: false })), 3000)
+      showToast(`Scraping pokrenut za ${slug}!`)
+      setTimeout(() => adminApi.getShops().then(r => setShops(r.data)), 3000)
+    } catch { showToast('Greška pri pokretanju') }
+    finally { setTimeout(() => setScraping(p => ({ ...p, [slug]: false })), 3000) }
+  }
+
+  const handleToggleFeatured = async (product: Product) => {
+    const existing = featured.find(f => f.productId === product.id)
+    if (existing) {
+      await adminApi.removeFeatured(existing.id)
+      setFeatured(f => f.filter(x => x.id !== existing.id))
+      showToast('Uklonjeno iz istaknutih')
+    } else {
+      const res = await adminApi.addFeatured(product.id)
+      setFeatured(f => [...f, res.data])
+      showToast('Dodano u istaknute! ⭐')
     }
   }
 
-  const statCards = stats ? [
-    { icon: <Users size={20} className="text-purple-500" />, label: 'Korisnici', value: stats.usersCount, bg: 'bg-purple-50' },
-    { icon: <List size={20} className="text-rose" />, label: 'Liste', value: stats.listsCount, bg: 'bg-rose/5' },
-    { icon: <Package size={20} className="text-sage" />, label: 'Proizvodi', value: stats.productsCount, bg: 'bg-sage-light/40' },
-    { icon: <Gift size={20} className="text-gold" />, label: 'Rezervacije', value: stats.reservationsCount, bg: 'bg-gold/10' },
-  ] : []
+  const handleSaveHero = async () => {
+    setHeroSaving(true)
+    try {
+      await adminApi.setSetting('heroImage', heroUrl)
+      setSettings(s => ({ ...s, heroImage: heroUrl }))
+      showToast('Hero slika spremljena!')
+    } catch { showToast('Greška pri spremanju') }
+    finally { setHeroSaving(false) }
+  }
+
+  const handleRoleToggle = async (u: AdminUser) => {
+    const newRole = u.role === 'ADMIN' ? 'USER' : 'ADMIN'
+    await adminApi.setUserRole(u.id, newRole)
+    setUsers(prev => prev.map(x => x.id === u.id ? { ...x, role: newRole as any } : x))
+    showToast(`${u.name} je sada ${newRole}`)
+  }
+
+  const TABS = [
+    { key: 'overview', label: 'Pregled', icon: '📊' },
+    { key: 'users', label: 'Korisnici', icon: '👥' },
+    { key: 'scraper', label: 'Scraper', icon: '🕷️' },
+    { key: 'featured', label: 'Istaknuti', icon: '⭐' },
+    { key: 'settings', label: 'Postavke', icon: '⚙️' },
+  ]
+
+  if (isLoading) return null
 
   return (
     <>
       <Navbar />
       <main className="min-h-screen pt-20 pb-16 px-4">
-        <div className="max-w-5xl mx-auto">
-          <div className="py-8">
-            <h1 className="font-serif text-3xl text-charcoal mb-1">Admin panel</h1>
-            <p className="text-warm-gray text-sm">Upravljanje scraperom i statistike sustava</p>
+        <div className="max-w-6xl mx-auto">
+          <div className="py-6 flex items-center justify-between">
+            <div>
+              <h1 className="font-serif text-3xl text-charcoal">Admin panel</h1>
+              <p className="text-warm-gray text-sm mt-1">Upravljanje Bebinom Listom</p>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-rose/10 text-rose rounded-full text-sm">
+              <Shield size={14} /> Admin
+            </div>
           </div>
 
-          {/* Stats */}
-          {stats && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-              {statCards.map((card, i) => (
-                <div key={i} className={clsx('rounded-2xl p-5 border border-blush/20', card.bg)}>
-                  <div className="mb-3">{card.icon}</div>
+          {/* Tabs */}
+          <div className="flex gap-1 bg-white rounded-2xl p-1 border border-blush/30 mb-8 overflow-x-auto">
+            {TABS.map(t => (
+              <button key={t.key} onClick={() => setTab(t.key as Tab)}
+                className={clsx('flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap flex-shrink-0',
+                  tab === t.key ? 'bg-rose text-white' : 'text-warm-gray hover:text-charcoal')}>
+                {t.icon} {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* OVERVIEW */}
+          {tab === 'overview' && stats && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {[
+                { icon: '👥', label: 'Korisnici', value: stats.usersCount },
+                { icon: '📋', label: 'Liste', value: stats.listsCount },
+                { icon: '📦', label: 'Proizvodi', value: stats.productsCount },
+                { icon: '🎁', label: 'Rezervacije', value: stats.reservationsCount },
+              ].map((card, i) => (
+                <div key={i} className="bg-white rounded-2xl p-5 border border-blush/30">
+                  <div className="text-3xl mb-2">{card.icon}</div>
                   <p className="text-2xl font-serif text-charcoal">{card.value.toLocaleString('hr-HR')}</p>
                   <p className="text-xs text-warm-gray mt-0.5">{card.label}</p>
                 </div>
@@ -98,97 +152,194 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* Shopovi / Scraperi */}
-          <h2 className="font-serif text-xl text-charcoal mb-4">Scraped shopovi</h2>
-          <div className="space-y-3">
-            {loading ? (
-              Array.from({ length: 2 }).map((_, i) => (
-                <div key={i} className="h-24 bg-white rounded-2xl border border-blush/30 shimmer" />
-              ))
-            ) : shops.length === 0 ? (
-              <div className="text-center py-12 bg-white rounded-2xl border border-blush/30">
-                <p className="text-warm-gray text-sm">Nema konfiguriranih shopova</p>
+          {/* USERS */}
+          {tab === 'users' && (
+            <div>
+              <div className="flex gap-3 mb-5">
+                <div className="relative flex-1">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-gray" />
+                  <input type="text" placeholder="Pretraži korisnike..." value={userSearch}
+                    onChange={e => { setUserSearch(e.target.value); setUserPage(1) }}
+                    className="w-full pl-9 pr-4 py-2.5 bg-white border border-blush/40 rounded-xl text-sm focus:outline-none" />
+                </div>
+                <span className="text-sm text-warm-gray self-center">{usersTotal} korisnika</span>
               </div>
-            ) : (
-              shops.map(shop => (
+              <div className="space-y-3">
+                {users.map(u => (
+                  <div key={u.id} className="bg-white rounded-2xl border border-blush/30 p-4 flex items-center gap-4 flex-wrap">
+                    <div className="w-10 h-10 bg-blush/40 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-sm font-medium text-rose">{u.name.charAt(0).toUpperCase()}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium text-charcoal">{u.name}</p>
+                        {u.role === 'ADMIN' && (
+                          <span className="px-2 py-0.5 bg-rose/10 text-rose text-xs rounded-full font-medium">Admin</span>
+                        )}
+                      </div>
+                      <p className="text-sm text-warm-gray">{u.email}</p>
+                      <div className="flex items-center gap-3 mt-1 flex-wrap">
+                        <span className="text-xs text-warm-gray/60">{u._count.lists} lista</span>
+                        {u.dueDate && <span className="text-xs text-warm-gray/60">Termin: {format(new Date(u.dueDate), 'd. MMM yyyy.', { locale: hr })}</span>}
+                        <span className="text-xs text-warm-gray/60">{format(new Date(u.createdAt), 'd. MMM yyyy.', { locale: hr })}</span>
+                      </div>
+                    </div>
+                    <button onClick={() => handleRoleToggle(u)}
+                      className={clsx('flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                        u.role === 'ADMIN' ? 'bg-rose/10 text-rose hover:bg-rose/20' : 'bg-sage-light/60 text-sage hover:bg-sage-light')}>
+                      <Shield size={12} />
+                      {u.role === 'ADMIN' ? 'Ukloni admin' : 'Postavi admin'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+              {usersTotal > 20 && (
+                <div className="flex justify-center gap-2 mt-6">
+                  <button onClick={() => setUserPage(p => Math.max(1, p - 1))} disabled={userPage === 1}
+                    className="px-4 py-2 border border-blush/40 rounded-full text-sm disabled:opacity-40">← Prethodna</button>
+                  <span className="px-4 py-2 text-sm text-warm-gray">Str. {userPage}</span>
+                  <button onClick={() => setUserPage(p => p + 1)} disabled={users.length < 20}
+                    className="px-4 py-2 border border-blush/40 rounded-full text-sm disabled:opacity-40">Sljedeća →</button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* SCRAPER */}
+          {tab === 'scraper' && (
+            <div className="space-y-4">
+              {shops.map(shop => (
                 <div key={shop.id} className="bg-white rounded-2xl border border-blush/30 p-5">
                   <div className="flex items-center justify-between gap-4 flex-wrap">
                     <div className="flex items-center gap-3">
-                      <div className={clsx(
-                        'w-2.5 h-2.5 rounded-full flex-shrink-0',
-                        shop.lastStatus === 'success' ? 'bg-sage' :
-                        shop.lastStatus === 'error' ? 'bg-rose' :
-                        shop.lastStatus === 'running' ? 'bg-gold animate-pulse' :
-                        'bg-warm-gray/30'
-                      )} />
+                      <div className={clsx('w-2.5 h-2.5 rounded-full flex-shrink-0',
+                        shop.lastStatus === 'success' ? 'bg-sage' : shop.lastStatus === 'error' ? 'bg-rose' :
+                        shop.lastStatus === 'running' ? 'bg-gold animate-pulse' : 'bg-warm-gray/30')} />
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="font-medium text-charcoal">{shop.name}</h3>
-                          <a
-                            href={shop.baseUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-warm-gray hover:text-sage transition-colors"
-                          >
-                            {shop.baseUrl}
-                          </a>
+                          <a href={shop.baseUrl} target="_blank" className="text-xs text-warm-gray hover:text-sage">{shop.baseUrl}</a>
                         </div>
                         <div className="flex items-center gap-3 mt-1 flex-wrap">
-                          <span className="text-xs text-warm-gray flex items-center gap-1">
-                            <Package size={10} />
-                            {shop.productsCount.toLocaleString('hr-HR')} proizvoda
-                          </span>
-                          {shop.lastRun && (
-                            <span className="text-xs text-warm-gray flex items-center gap-1">
-                              <Clock size={10} />
-                              {format(new Date(shop.lastRun), 'd. MMM yyyy HH:mm', { locale: hr })}
-                            </span>
-                          )}
+                          <span className="text-xs text-warm-gray"><Package size={10} className="inline mr-1" />{shop.productsCount.toLocaleString('hr-HR')} proizvoda</span>
+                          {shop.lastRun && <span className="text-xs text-warm-gray"><Clock size={10} className="inline mr-1" />{format(new Date(shop.lastRun), 'd. MMM HH:mm', { locale: hr })}</span>}
                           {shop.lastStatus && (
-                            <span className={clsx(
-                              'text-xs flex items-center gap-1 font-medium',
-                              shop.lastStatus === 'success' ? 'text-sage' :
-                              shop.lastStatus === 'error' ? 'text-rose' :
-                              shop.lastStatus === 'running' ? 'text-gold' :
-                              'text-warm-gray'
-                            )}>
-                              {shop.lastStatus === 'success' && <CheckCircle size={10} />}
-                              {shop.lastStatus === 'error' && <XCircle size={10} />}
-                              {shop.lastStatus === 'running' && <RefreshCw size={10} className="animate-spin" />}
-                              {shop.lastStatus}
+                            <span className={clsx('text-xs font-medium',
+                              shop.lastStatus === 'success' ? 'text-sage' : shop.lastStatus === 'error' ? 'text-rose' : 'text-gold')}>
+                              {shop.lastStatus === 'success' ? '✓' : shop.lastStatus === 'error' ? '✗' : '⟳'} {shop.lastStatus}
                             </span>
                           )}
                         </div>
-                        {shop.lastStatus === 'error' && shop.errorMsg && (
-                          <p className="text-xs text-rose/70 mt-1 max-w-lg truncate">{shop.errorMsg}</p>
-                        )}
+                        {shop.errorMsg && <p className="text-xs text-rose/70 mt-1">{shop.errorMsg}</p>}
                       </div>
                     </div>
-
-                    <button
-                      onClick={() => handleScrape(shop.slug)}
-                      disabled={scraping[shop.slug] || shop.lastStatus === 'running'}
-                      className="flex items-center gap-2 px-4 py-2 bg-sage-light/60 text-sage text-sm font-medium rounded-full hover:bg-sage-light transition-colors disabled:opacity-50"
-                    >
+                    <button onClick={() => handleScrape(shop.slug)} disabled={scraping[shop.slug]}
+                      className="flex items-center gap-2 px-4 py-2 bg-sage-light/60 text-sage text-sm font-medium rounded-full hover:bg-sage-light transition-colors disabled:opacity-50">
                       <RefreshCw size={14} className={scraping[shop.slug] ? 'animate-spin' : ''} />
                       {scraping[shop.slug] ? 'Pokrećem...' : 'Pokreni scraper'}
                     </button>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
-
-          {/* Upute */}
-          <div className="mt-8 p-5 bg-white rounded-2xl border border-blush/30">
-            <h3 className="font-medium text-charcoal mb-3">ℹ️ Upute za scraping</h3>
-            <div className="text-sm text-warm-gray space-y-2">
-              <p>• Scraper automatski radi svaku noć u <strong>02:00</strong></p>
-              <p>• Ručno pokretanje može trajati <strong>15-45 minuta</strong> ovisno o broju kategorija</p>
-              <p>• Scraper koristi Playwright (headless Chromium) — trebaš ga instalirati s <code className="bg-cream px-1 py-0.5 rounded text-xs">npx playwright install chromium</code></p>
-              <p>• Status "running" znači da je scraper aktivan u pozadini — refresh stranicu za ažurni status</p>
+              ))}
+              <div className="p-4 bg-cream rounded-2xl text-sm text-warm-gray">
+                💡 Scraper automatski radi svake noći u <strong>02:00</strong>. Ručno pokretanje traje 10-30 minuta.
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* FEATURED */}
+          {tab === 'featured' && (
+            <div>
+              <div className="mb-6">
+                <h2 className="font-serif text-xl text-charcoal mb-2">Istaknuti proizvodi ({featured.length}/12)</h2>
+                <p className="text-sm text-warm-gray">Istaknuti proizvodi prikazuju se na početnoj stranici.</p>
+              </div>
+              {featured.length > 0 && (
+                <div className="mb-8">
+                  <h3 className="text-sm font-medium text-warm-gray uppercase tracking-wide mb-3">Trenutno istaknuti</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {featured.map((f: any) => (
+                      <div key={f.id} className="bg-white rounded-2xl border border-gold/30 p-3 relative">
+                        <div className="absolute top-2 right-2">
+                          <button onClick={() => adminApi.removeFeatured(f.id).then(() => setFeatured(prev => prev.filter(x => x.id !== f.id))).then(() => showToast('Uklonjeno'))}
+                            className="p-1 bg-rose/10 text-rose rounded-full hover:bg-rose/20 transition-colors"><X size={12} /></button>
+                        </div>
+                        {f.product.imageUrl && <img src={f.product.imageUrl} alt="" className="w-full h-24 object-contain mb-2" />}
+                        <p className="text-xs font-medium text-charcoal line-clamp-2">{f.product.name}</p>
+                        <p className="text-xs text-rose mt-0.5">{f.product.price.toFixed(2)} €</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <h3 className="text-sm font-medium text-warm-gray uppercase tracking-wide mb-3">Dodaj proizvod</h3>
+              <div className="relative mb-4">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-gray" />
+                <input type="text" placeholder="Pretraži proizvode..." value={productSearch}
+                  onChange={e => setProductSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2.5 bg-white border border-blush/40 rounded-xl text-sm focus:outline-none" />
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {products.map(product => {
+                  const isFeatured = featured.some(f => f.productId === product.id)
+                  return (
+                    <button key={product.id} onClick={() => handleToggleFeatured(product)}
+                      className={clsx('bg-white rounded-2xl border p-3 text-left transition-all hover:shadow-md',
+                        isFeatured ? 'border-gold/40 bg-gold/5' : 'border-blush/30')}>
+                      {product.imageUrl && <img src={product.imageUrl} alt="" className="w-full h-20 object-contain mb-2" />}
+                      <p className="text-xs font-medium text-charcoal line-clamp-2">{product.name}</p>
+                      <div className="flex items-center justify-between mt-1">
+                        <p className="text-xs text-rose">{product.price.toFixed(2)} €</p>
+                        {isFeatured ? <span className="text-xs text-gold">⭐ Istaknuto</span> : <span className="text-xs text-warm-gray/40">+ Dodaj</span>}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* SETTINGS */}
+          {tab === 'settings' && (
+            <div className="space-y-6 max-w-2xl">
+              <div className="bg-white rounded-2xl border border-blush/30 p-6">
+                <h2 className="font-serif text-xl text-charcoal mb-4">Hero slika</h2>
+                <p className="text-sm text-warm-gray mb-4">URL slike koja se prikazuje na početnoj stranici (hero sekcija).</p>
+                <div className="space-y-3">
+                  <input type="url" placeholder="https://..." value={heroUrl} onChange={e => setHeroUrl(e.target.value)}
+                    className="w-full px-4 py-3 bg-cream border border-blush/40 rounded-xl text-sm focus:outline-none focus:border-rose" />
+                  {heroUrl && (
+                    <div className="rounded-xl overflow-hidden border border-blush/30 h-40">
+                      <img src={heroUrl} alt="Hero preview" className="w-full h-full object-cover" onError={e => (e.currentTarget.style.display = 'none')} />
+                    </div>
+                  )}
+                  <button onClick={handleSaveHero} disabled={heroSaving}
+                    className="px-5 py-2.5 bg-rose text-white rounded-full text-sm font-medium hover:bg-rose/90 transition-colors disabled:opacity-50">
+                    {heroSaving ? 'Sprema...' : 'Spremi hero sliku'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-blush/30 p-6">
+                <h2 className="font-serif text-xl text-charcoal mb-4">Opće postavke</h2>
+                {[
+                  { key: 'siteName', label: 'Naziv stranice', placeholder: 'Bebina Lista' },
+                  { key: 'siteTagline', label: 'Podnaslov', placeholder: 'Baby lista za nove roditelje' },
+                  { key: 'contactEmail', label: 'Kontakt email', placeholder: 'info@bebinalista.hr' },
+                ].map(setting => (
+                  <div key={setting.key} className="mb-4">
+                    <label className="block text-xs font-medium text-warm-gray mb-1.5 uppercase tracking-wide">{setting.label}</label>
+                    <div className="flex gap-2">
+                      <input type="text" placeholder={setting.placeholder}
+                        defaultValue={settings[setting.key] || ''}
+                        onBlur={e => adminApi.setSetting(setting.key, e.target.value).then(() => showToast('Spremljeno!')).catch(() => {})}
+                        className="flex-1 px-4 py-2.5 bg-cream border border-blush/40 rounded-xl text-sm focus:outline-none focus:border-rose" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </main>
 
@@ -199,4 +350,8 @@ export default function AdminPage() {
       )}
     </>
   )
+}
+
+function X({ size }: { size: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
 }

@@ -14,20 +14,28 @@ const app = express()
 const PORT = process.env.PORT || 3001
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: [
+    process.env.FRONTEND_URL || 'http://localhost:3000',
+    'http://localhost:3000',
+    'https://heroic-caring-production.up.railway.app',
+  ],
   credentials: true
 }))
-app.use(express.json())
+app.use(express.json({ limit: '10mb' }))
 
-// Rute
 app.use('/api/auth', authRouter)
 app.use('/api/lists', listsRouter)
 app.use('/api/products', productsRouter)
 app.use('/api/public', publicRouter)
 app.use('/api/admin', adminRouter)
 
-app.get('/api/health', (_, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() })
+app.get('/api/health', (_, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
+
+// Privremena ruta za scraper
+app.post('/api/run-scraper', async (_, res) => {
+  res.json({ message: 'Scraper pokrenut!' })
+  const { runBabyCenterScraper } = await import('./scraper/babycenter')
+  runBabyCenterScraper().catch(console.error)
 })
 
 app.listen(PORT, () => {

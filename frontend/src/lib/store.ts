@@ -6,6 +6,7 @@ interface User {
   name: string
   dueDate?: string
   babyGender?: string
+  role: 'USER' | 'ADMIN'
 }
 
 interface AuthStore {

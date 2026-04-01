@@ -10,7 +10,6 @@ export function authMiddleware(req: AuthRequest, res: Response, next: NextFuncti
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Potrebna prijava' })
   }
-
   const token = authHeader.slice(7)
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string }
@@ -19,4 +18,15 @@ export function authMiddleware(req: AuthRequest, res: Response, next: NextFuncti
   } catch {
     return res.status(401).json({ error: 'Nevažeći token' })
   }
+}
+
+export async function adminAuthMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
+  authMiddleware(req, res, async () => {
+    const { prisma } = await import('../utils/prisma')
+    const user = await prisma.user.findUnique({ where: { id: req.userId! }, select: { role: true } })
+    if (user?.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Nedovoljna prava pristupa' })
+    }
+    next()
+  })
 }
