@@ -12,7 +12,7 @@ interface Product {
   price: number | null;
   imageUrl: string | null;
   url: string;
-  category: string | null;
+  category: { id: string; name: string; slug: string; parentId: string | null } | null;
 }
 
 interface ListItem {
@@ -258,7 +258,9 @@ function ItemCard({
           </span>
           {item.product.category && (
             <span className="bg-rose-50 px-2 py-0.5 rounded-full">
-              {item.product.category}
+              {typeof item.product.category === 'object' 
+                ? (item.product.category as { name: string }).name 
+                : item.product.category}
             </span>
           )}
         </div>
