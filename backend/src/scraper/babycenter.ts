@@ -1,4 +1,5 @@
-import { chromium, Browser, Page } from 'playwright'
+import axios from 'axios'
+import * as cheerio from 'cheerio'
 import { prisma } from '../utils/prisma'
 
 const BASE_URL = 'https://www.babycenter.hr'
