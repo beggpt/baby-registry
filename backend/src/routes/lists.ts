@@ -4,6 +4,23 @@ import { prisma } from '../utils/prisma'
 import { authMiddleware, AuthRequest } from '../middleware/auth'
 
 export const listsRouter = Router()
+// Javna ruta - bez auth
+listsRouter.get('/public/:id', async (req, res) => {
+  try {
+    const list = await prisma.babyList.findFirst({
+      where: { id: req.params.id, isPublic: true },
+      include: {
+        user: { select: { name: true } },
+        items: {
+          include: listItemInclude,
+          orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }]
+        }
+      }
+    })
+    if (!list) return res.status(404).json({ error: 'Lista nije pronađena' })
+    res.json(list)
+  } catch { res.status(500).json({ error: 'Greška na serveru' }) }
+})
 listsRouter.use(authMiddleware)
 
 const listItemInclude = {
