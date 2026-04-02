@@ -4,7 +4,14 @@ import { prisma } from '../utils/prisma'
 import { authMiddleware, AuthRequest } from '../middleware/auth'
 
 export const listsRouter = Router()
-// Javna ruta - bez auth
+
+// Mora biti PRIJE ruta koje ga koriste
+const listItemInclude = {
+  product: { include: { category: true } },
+  reservation: true
+}
+
+// Javna ruta - bez auth (mora biti PRIJE listsRouter.use(authMiddleware))
 listsRouter.get('/public/:id', async (req, res) => {
   try {
     const list = await prisma.babyList.findFirst({
@@ -21,12 +28,8 @@ listsRouter.get('/public/:id', async (req, res) => {
     res.json(list)
   } catch { res.status(500).json({ error: 'Greška na serveru' }) }
 })
-listsRouter.use(authMiddleware)
 
-const listItemInclude = {
-  product: { include: { category: true } },
-  reservation: true
-}
+listsRouter.use(authMiddleware)
 
 listsRouter.get('/', async (req: AuthRequest, res) => {
   try {
@@ -71,7 +74,6 @@ listsRouter.get('/:id', async (req: AuthRequest, res) => {
   } catch { res.status(500).json({ error: 'Greška na serveru' }) }
 })
 
-// PATCH - ažuriranje liste (ime, opis, prigoda, vidljivost)
 listsRouter.patch('/:id', async (req: AuthRequest, res) => {
   try {
     const { name, description, isPublic, occasion } = req.body
