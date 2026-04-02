@@ -24,6 +24,35 @@ publicRouter.get('/lista/:slug', async (req, res) => {
   } catch { res.status(500).json({ error: 'Greška na serveru' }) }
 })
 
+// GET /api/public/pretraga?q=Ana+Horvat
+// Pretraga liste po imenu mame
+publicRouter.get('/pretraga', async (req, res) => {
+  try {
+    const { q } = req.query as { q: string }
+    if (!q || q.trim().length < 2) {
+      return res.status(400).json({ error: 'Upiši najmanje 2 znaka' })
+    }
+
+    const lists = await prisma.babyList.findMany({
+      where: {
+        isPublic: true,
+        OR: [
+          { user: { name: { contains: q.trim(), mode: 'insensitive' } } },
+          { name: { contains: q.trim(), mode: 'insensitive' } },
+        ]
+      },
+      include: {
+        user: { select: { name: true, dueDate: true, babyGender: true } },
+        _count: { select: { items: true } }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20
+    })
+
+    res.json(lists)
+  } catch { res.status(500).json({ error: 'Greška na serveru' }) }
+})
+
 // POST /api/public/lista/:slug/rezerviraj/:itemId
 publicRouter.post('/lista/:slug/rezerviraj/:itemId', async (req, res) => {
   try {
@@ -49,7 +78,7 @@ publicRouter.post('/lista/:slug/rezerviraj/:itemId', async (req, res) => {
       data: { listItemId: listItem.id, reservedBy: data.reservedBy, note: data.note }
     })
 
-    // Email notifikacija mami (ne blokira odgovor)
+    // Email mami async
     prisma.babyList.findUnique({
       where: { id: list.id },
       include: {
@@ -83,15 +112,13 @@ publicRouter.post('/lista/:slug/rezerviraj/:itemId', async (req, res) => {
   }
 })
 
-// PATCH /api/public/lista/:slug/rezerviraj/:itemId/status — RESERVED → PURCHASED
+// PATCH /api/public/lista/:slug/rezerviraj/:itemId/status
 publicRouter.patch('/lista/:slug/rezerviraj/:itemId/status', async (req, res) => {
   try {
     const { reservedBy, status } = req.body
     if (!['RESERVED', 'PURCHASED'].includes(status)) return res.status(400).json({ error: 'Nevažeći status' })
-
     const list = await prisma.babyList.findUnique({ where: { shareSlug: req.params.slug } })
     if (!list) return res.status(404).json({ error: 'Lista nije pronađena' })
-
     const listItem = await prisma.listItem.findFirst({
       where: { id: req.params.itemId, listId: list.id },
       include: { reservation: true }
@@ -100,11 +127,7 @@ publicRouter.patch('/lista/:slug/rezerviraj/:itemId/status', async (req, res) =>
     if (listItem.reservation.reservedBy.toLowerCase() !== reservedBy?.toLowerCase()) {
       return res.status(403).json({ error: 'Pogrešno ime' })
     }
-
-    const updated = await prisma.reservation.update({
-      where: { id: listItem.reservation.id },
-      data: { status }
-    })
+    const updated = await prisma.reservation.update({ where: { id: listItem.reservation.id }, data: { status } })
     res.json({ success: true, reservation: updated })
   } catch { res.status(500).json({ error: 'Greška na serveru' }) }
 })
@@ -115,7 +138,6 @@ publicRouter.delete('/lista/:slug/rezerviraj/:itemId', async (req, res) => {
     const { reservedBy } = req.body
     const list = await prisma.babyList.findUnique({ where: { shareSlug: req.params.slug } })
     if (!list) return res.status(404).json({ error: 'Lista nije pronađena' })
-
     const listItem = await prisma.listItem.findFirst({
       where: { id: req.params.itemId, listId: list.id },
       include: { reservation: true }
@@ -124,7 +146,6 @@ publicRouter.delete('/lista/:slug/rezerviraj/:itemId', async (req, res) => {
     if (listItem.reservation.reservedBy.toLowerCase() !== reservedBy?.toLowerCase()) {
       return res.status(403).json({ error: 'Pogrešno ime' })
     }
-
     await prisma.reservation.delete({ where: { id: listItem.reservation.id } })
     res.json({ success: true, message: 'Rezervacija je uklonjena' })
   } catch { res.status(500).json({ error: 'Greška na serveru' }) }

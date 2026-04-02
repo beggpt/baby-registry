@@ -1,7 +1,7 @@
 export type Priority = 'HIGH' | 'MEDIUM' | 'LOW'
 export type ReservationStatus = 'RESERVED' | 'PURCHASED'
 export type BabyGender = 'boy' | 'girl' | 'surprise'
-export type Occasion = 'birth' | 'birthday' | 'baptism' | 'confirmation' | 'other'
+export type Occasion = 'birth' | 'birthday' | 'other'
 export type Role = 'USER' | 'ADMIN'
 
 export interface User {

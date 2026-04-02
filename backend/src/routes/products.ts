@@ -33,11 +33,24 @@ productsRouter.get('/', async (req, res) => {
     if (categorySlug) {
       const category = await prisma.category.findUnique({ where: { slug: categorySlug } })
       if (category) {
+        // Dohvati i podkategorije i podpodkategorije
         const children = await prisma.category.findMany({ where: { parentId: category.id } })
-        where.categoryId = { in: [category.id, ...children.map(c => c.id)] }
+        const grandchildren = await prisma.category.findMany({
+          where: { parentId: { in: children.map(c => c.id) } }
+        })
+        const allIds = [category.id, ...children.map(c => c.id), ...grandchildren.map(c => c.id)]
+        where.categoryId = { in: allIds }
       }
     } else if (categoryId) {
-      where.categoryId = categoryId
+      const category = await prisma.category.findUnique({ where: { id: categoryId } })
+      if (category) {
+        const children = await prisma.category.findMany({ where: { parentId: category.id } })
+        const grandchildren = await prisma.category.findMany({
+          where: { parentId: { in: children.map(c => c.id) } }
+        })
+        const allIds = [category.id, ...children.map(c => c.id), ...grandchildren.map(c => c.id)]
+        where.categoryId = { in: allIds }
+      }
     }
 
     let orderBy: any = { name: 'asc' }
@@ -50,9 +63,7 @@ productsRouter.get('/', async (req, res) => {
       prisma.product.count({ where })
     ])
 
-    // Raspon cijena za filter
     const priceRange = await prisma.product.aggregate({
-      where: q || shopSlug ? where : {},
       _min: { price: true },
       _max: { price: true },
     })
@@ -60,7 +71,7 @@ productsRouter.get('/', async (req, res) => {
     res.json({
       products,
       pagination: { page: parseInt(page), limit: take, total, totalPages: Math.ceil(total / take) },
-      priceRange: { min: priceRange._min.price || 0, max: priceRange._max.price || 10000 }
+      priceRange: { min: Math.floor(priceRange._min.price || 0), max: Math.ceil(priceRange._max.price || 10000) }
     })
   } catch (err) {
     console.error(err)
@@ -68,7 +79,7 @@ productsRouter.get('/', async (req, res) => {
   }
 })
 
-// GET /api/products/categories - s točnim brojem proizvoda
+// GET /api/products/categories - s točnim brojem uključujući sve podkategorije
 productsRouter.get('/categories', async (req, res) => {
   try {
     const categories = await prisma.category.findMany({
@@ -76,6 +87,7 @@ productsRouter.get('/categories', async (req, res) => {
       include: {
         children: {
           include: {
+            children: { include: { _count: { select: { products: true } } } },
             _count: { select: { products: true } }
           }
         },
@@ -84,16 +96,18 @@ productsRouter.get('/categories', async (req, res) => {
       orderBy: { name: 'asc' }
     })
 
-    // Za svaku top-level kategoriju zbroji i proizvode podkategorija
-    const categoriesWithCounts = await Promise.all(categories.map(async (cat) => {
+    // Za svaku top-level kategoriju zbroji SVE proizvode (vlastite + djeca + unuci)
+    const result = await Promise.all(categories.map(async (cat) => {
       const childIds = cat.children.map(c => c.id)
+      const grandchildIds = cat.children.flatMap(c => (c as any).children?.map((gc: any) => gc.id) || [])
+      const allIds = [cat.id, ...childIds, ...grandchildIds]
       const totalCount = await prisma.product.count({
-        where: { categoryId: { in: [cat.id, ...childIds] } }
+        where: { categoryId: { in: allIds } }
       })
       return { ...cat, totalCount }
     }))
 
-    res.json(categoriesWithCounts)
+    res.json(result)
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Greška na serveru' })
@@ -108,7 +122,7 @@ productsRouter.get('/featured', async (req, res) => {
       orderBy: { position: 'asc' },
       take: 12
     })
-    res.json(featured.map(f => f.product))
+    res.json(featured.map((f: any) => f.product))
   } catch {
     res.status(500).json({ error: 'Greška na serveru' })
   }

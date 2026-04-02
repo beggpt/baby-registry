@@ -4,30 +4,33 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { authApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
-import { Eye, EyeOff, ArrowLeft } from 'lucide-react'
+import { Eye, EyeOff, ArrowLeft, Calendar } from 'lucide-react'
 import clsx from 'clsx'
 
 const OCCASIONS = [
-  { value: 'birth', emoji: '🍼', label: 'Rođenje djeteta' },
-  { value: 'birthday', emoji: '🎂', label: 'Rođendan' },
-  { value: 'baptism', emoji: '✝️', label: 'Krstitke' },
-  { value: 'confirmation', emoji: '🕊️', label: 'Krizma' },
-  { value: 'other', emoji: '🎁', label: 'Ostalo' },
+  { value: 'birth',    emoji: '🍼', label: 'Rođenje djeteta', dateLabel: 'Planirani termin poroda', datePlaceholder: '15/06/2025' },
+  { value: 'birthday', emoji: '🎂', label: 'Dječji rođendan',  dateLabel: 'Datum rođendana',          datePlaceholder: '15/06/2022' },
 ]
+
+function parseDMY(s: string): Date | null {
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (!m) return null
+  const d = new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]))
+  return isNaN(d.getTime()) ? null : d
+}
 
 declare global { interface Window { google?: any } }
 
 export default function RegistracijaPage() {
   const router = useRouter()
   const { setAuth } = useAuthStore()
-  const [form, setForm] = useState({ name: '', email: '', password: '', dueDate: '', babyGender: '', occasion: '' })
+  const [form, setForm] = useState({ name: '', email: '', password: '', dateInput: '', babyGender: '', occasion: '' })
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [step, setStep] = useState<1 | 2>(1)
 
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+  const selectedOcc = OCCASIONS.find(o => o.value === form.occasion)
 
   useEffect(() => {
     if (!googleClientId) return
@@ -37,7 +40,15 @@ export default function RegistracijaPage() {
     script.onload = () => {
       window.google?.accounts.id.initialize({
         client_id: googleClientId,
-        callback: handleGoogleLogin,
+        callback: async (response: { credential: string }) => {
+          try {
+            const res = await authApi.googleLogin(response.credential)
+            setAuth(res.data.user, res.data.token)
+            router.push('/moja-lista')
+          } catch (err: any) {
+            setError(err.response?.data?.error || 'Google prijava nije uspjela')
+          }
+        },
       })
       window.google?.accounts.id.renderButton(
         document.getElementById('google-btn'),
@@ -47,22 +58,17 @@ export default function RegistracijaPage() {
     document.head.appendChild(script)
   }, [googleClientId])
 
-  const handleGoogleLogin = async (response: { credential: string }) => {
-    setGoogleLoading(true)
-    setError(null)
-    try {
-      const res = await authApi.googleLogin(response.credential)
-      setAuth(res.data.user, res.data.token)
-      router.push('/moja-lista')
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Google prijava nije uspjela')
-    } finally {
-      setGoogleLoading(false)
-    }
-  }
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
+  }
+
+  // Format date input automatski s /
+  const handleDateInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value.replace(/[^\d]/g, '')
+    if (val.length >= 3) val = val.slice(0, 2) + '/' + val.slice(2)
+    if (val.length >= 6) val = val.slice(0, 5) + '/' + val.slice(5)
+    val = val.slice(0, 10)
+    setForm(prev => ({ ...prev, dateInput: val }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -71,6 +77,17 @@ export default function RegistracijaPage() {
       setError('Molimo ispunite sva obavezna polja')
       return
     }
+    // Parsiranje datuma
+    let dueDate: string | undefined
+    if (form.dateInput && form.occasion) {
+      const parsed = parseDMY(form.dateInput)
+      if (!parsed) {
+        setError('Datum nije ispravan. Koristi format dd/mm/yyyy')
+        return
+      }
+      dueDate = parsed.toISOString()
+    }
+
     setLoading(true)
     setError(null)
     try {
@@ -78,7 +95,7 @@ export default function RegistracijaPage() {
         name: form.name.trim(),
         email: form.email.trim().toLowerCase(),
         password: form.password,
-        dueDate: form.dueDate || undefined,
+        dueDate,
         babyGender: form.babyGender || undefined,
       })
       setAuth(res.data.user, res.data.token)
@@ -92,19 +109,19 @@ export default function RegistracijaPage() {
 
   return (
     <div className="min-h-screen bg-cream flex">
-      {/* Dekorativni lijevi panel */}
+      {/* Lijevi panel */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blush via-cream to-sage-light/30 items-center justify-center p-12 relative overflow-hidden">
         <div className="absolute top-1/4 right-1/4 w-64 h-64 bg-blush/60 rounded-full blur-3xl" />
         <div className="absolute bottom-1/4 left-1/4 w-48 h-48 bg-sage-light/50 rounded-full blur-2xl" />
         <div className="relative text-center">
           <span className="text-8xl block mb-6">🍼</span>
           <h2 className="font-serif text-4xl text-charcoal mb-4">Svaka beba zaslužuje savršen doček</h2>
-          <p className="text-warm-gray max-w-xs mx-auto leading-relaxed">
+          <p className="text-warm-gray max-w-xs mx-auto leading-relaxed mb-8">
             Kreiraj svoju listu željenih poklona i podijeli je s onima koji te vole.
           </p>
-          <div className="mt-8 flex flex-col gap-3">
+          <div className="flex flex-col gap-3">
             {OCCASIONS.map(o => (
-              <div key={o.value} className="flex items-center gap-3 bg-white/50 rounded-2xl px-4 py-3 text-left">
+              <div key={o.value} className="flex items-center gap-3 bg-white/50 rounded-2xl px-5 py-3.5 text-left">
                 <span className="text-2xl">{o.emoji}</span>
                 <span className="text-sm text-charcoal font-medium">{o.label}</span>
               </div>
@@ -127,12 +144,9 @@ export default function RegistracijaPage() {
           </p>
 
           {error && (
-            <div className="mb-5 p-3 bg-rose/10 border border-rose/20 rounded-xl text-sm text-rose">
-              {error}
-            </div>
+            <div className="mb-5 p-3 bg-rose/10 border border-rose/20 rounded-xl text-sm text-rose">{error}</div>
           )}
 
-          {/* Google OAuth */}
           {googleClientId && (
             <>
               <div id="google-btn" className="w-full mb-4" />
@@ -145,18 +159,17 @@ export default function RegistracijaPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Osnovno */}
             <div>
               <label className="block text-xs font-medium text-warm-gray mb-1.5 uppercase tracking-wide">Ime i prezime *</label>
               <input type="text" name="name" required placeholder="Ana Horvat" value={form.name} onChange={handleChange}
                 className="w-full px-4 py-3 bg-white border border-blush/40 rounded-xl text-sm focus:outline-none focus:border-rose transition-colors" />
             </div>
-
             <div>
               <label className="block text-xs font-medium text-warm-gray mb-1.5 uppercase tracking-wide">Email *</label>
               <input type="email" name="email" required placeholder="ana@email.com" value={form.email} onChange={handleChange}
                 className="w-full px-4 py-3 bg-white border border-blush/40 rounded-xl text-sm focus:outline-none focus:border-rose transition-colors" />
             </div>
-
             <div>
               <label className="block text-xs font-medium text-warm-gray mb-1.5 uppercase tracking-wide">Lozinka *</label>
               <div className="relative">
@@ -170,37 +183,63 @@ export default function RegistracijaPage() {
 
             {/* Prigoda */}
             <div>
-              <label className="block text-xs font-medium text-warm-gray mb-2 uppercase tracking-wide">Prigoda za listu</label>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <label className="block text-xs font-medium text-warm-gray mb-2 uppercase tracking-wide">Za što kreiramo listu?</label>
+              <div className="grid grid-cols-2 gap-2">
                 {OCCASIONS.map(o => (
                   <button key={o.value} type="button"
-                    onClick={() => setForm(p => ({ ...p, occasion: p.occasion === o.value ? '' : o.value }))}
-                    className={clsx('flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-medium border transition-all text-left',
+                    onClick={() => setForm(p => ({ ...p, occasion: p.occasion === o.value ? '' : o.value, dateInput: '' }))}
+                    className={clsx('flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium border transition-all',
                       form.occasion === o.value ? 'border-rose bg-blush/30 text-charcoal' : 'border-blush/40 text-warm-gray hover:border-blush-mid')}>
-                    <span>{o.emoji}</span> {o.label}
+                    <span className="text-xl">{o.emoji}</span> {o.label}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Opcionalno */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-warm-gray mb-1.5 uppercase tracking-wide">Termin</label>
-                <input type="date" name="dueDate" value={form.dueDate} onChange={handleChange}
-                  className="w-full px-3 py-3 bg-white border border-blush/40 rounded-xl text-sm focus:outline-none focus:border-rose transition-colors" />
+            {/* Datum ovisno o prigodi */}
+            {selectedOcc && (
+              <div className="fade-up">
+                <label className="block text-xs font-medium text-warm-gray mb-1.5 uppercase tracking-wide">
+                  <Calendar size={11} className="inline mr-1" />
+                  {selectedOcc.dateLabel}
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    name="dateInput"
+                    placeholder={selectedOcc.datePlaceholder}
+                    value={form.dateInput}
+                    onChange={handleDateInput}
+                    maxLength={10}
+                    className="w-full px-4 py-3 bg-white border border-blush/40 rounded-xl text-sm focus:outline-none focus:border-rose transition-colors font-mono tracking-wider"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-warm-gray/50">dd/mm/yyyy</span>
+                </div>
+                {form.dateInput.length === 10 && !parseDMY(form.dateInput) && (
+                  <p className="text-xs text-rose mt-1">Datum nije ispravan</p>
+                )}
+                {form.dateInput.length === 10 && parseDMY(form.dateInput) && (
+                  <p className="text-xs text-sage mt-1">✓ {parseDMY(form.dateInput)?.toLocaleDateString('hr-HR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                )}
               </div>
-              <div>
-                <label className="block text-xs font-medium text-warm-gray mb-1.5 uppercase tracking-wide">Spol bebe</label>
-                <select name="babyGender" value={form.babyGender} onChange={handleChange}
-                  className="w-full px-3 py-3 bg-white border border-blush/40 rounded-xl text-sm focus:outline-none focus:border-rose transition-colors appearance-none">
-                  <option value="">Odaberi...</option>
-                  <option value="boy">💙 Dječak</option>
-                  <option value="girl">💗 Djevojčica</option>
-                  <option value="surprise">🎀 Iznenađenje</option>
-                </select>
+            )}
+
+            {/* Spol bebe - samo za birth */}
+            {form.occasion === 'birth' && (
+              <div className="fade-up">
+                <label className="block text-xs font-medium text-warm-gray mb-2 uppercase tracking-wide">Spol bebe</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[{ value: 'boy', emoji: '💙', label: 'Dječak' }, { value: 'girl', emoji: '💗', label: 'Djevojčica' }, { value: 'surprise', emoji: '🎀', label: 'Iznenađenje' }].map(opt => (
+                    <button key={opt.value} type="button"
+                      onClick={() => setForm(p => ({ ...p, babyGender: p.babyGender === opt.value ? '' : opt.value }))}
+                      className={clsx('flex flex-col items-center gap-1 py-3 rounded-xl text-xs font-medium border transition-all',
+                        form.babyGender === opt.value ? 'border-rose bg-blush/30 text-charcoal' : 'border-blush/40 text-warm-gray hover:border-blush-mid')}>
+                      <span className="text-xl">{opt.emoji}</span> {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             <button type="submit" disabled={loading}
               className="w-full py-3.5 bg-rose text-white font-medium rounded-full hover:bg-rose/90 transition-all hover:shadow-lg hover:shadow-rose/20 disabled:opacity-60 mt-2">

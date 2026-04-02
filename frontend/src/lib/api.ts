@@ -104,3 +104,8 @@ export const adminApi = {
   getProducts: (params?: { page?: number; q?: string; shop?: string }) =>
     api.get('/admin/products', { params }),
 }
+
+// Dodaj search endpoint
+export const searchApi = {
+  findLists: (q: string) => api.get('/public/pretraga', { params: { q } }),
+}
