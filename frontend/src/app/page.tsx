@@ -1,34 +1,63 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import ProductCard from '@/components/ProductCard'
 import { productsApi, adminApi } from '@/lib/api'
+import { useAuthStore } from '@/lib/store'
 import { Product } from '@/types'
 import { Heart, Share2, Gift, ShoppingBag, ArrowRight } from 'lucide-react'
 
 const OCCASIONS = [
-  { emoji: '🍼', label: 'Rođenje djeteta', slug: 'birth' },
-  { emoji: '🎂', label: 'Rođendan', slug: 'birthday' },
-  { emoji: '✝️', label: 'Krstitke', slug: 'baptism' },
-  { emoji: '🕊️', label: 'Krizma', slug: 'confirmation' },
+  { value: 'birth',    emoji: '🍼', label: 'Rođenje djeteta' },
+  { value: 'birthday', emoji: '🎂', label: 'Rođendan djeteta' },
+]
+
+const ALL_CATEGORIES = [
+  { emoji: '🛒', name: 'Kolica', slug: 'kolica' },
+  { emoji: '🚗', name: 'Autosjedalice', slug: 'autosjedalice' },
+  { emoji: '🤱', name: 'Nosiljke', slug: 'nosiljke-nosiljke' },
+  { emoji: '🛏️', name: 'Kreveti i vrtići', slug: 'kreveti-vrtici' },
+  { emoji: '🍼', name: 'Hranjenje', slug: 'hranjenje' },
+  { emoji: '🧴', name: 'Njega', slug: 'njega' },
+  { emoji: '🧸', name: 'Igračke za bebe', slug: 'baby-igracke' },
+  { emoji: '🎮', name: 'Kreativne igračke', slug: 'kreativne-igracke' },
+  { emoji: '📚', name: 'Knjige', slug: 'knjige' },
+  { emoji: '👟', name: 'Obuća', slug: 'cipele' },
+  { emoji: '👗', name: 'Odjeća', slug: 'kompleti-odjeca' },
+  { emoji: '🛁', name: 'Kupanje', slug: 'kupanje' },
+  { emoji: '🏃', name: 'Sport i rekreacija', slug: 'na-kotacima' },
+  { emoji: '💝', name: 'Za mame', slug: 'za-mame' },
+  { emoji: '🛋️', name: 'Posteljina', slug: 'posteljina' },
+  { emoji: '🪑', name: 'Hranilice', slug: 'hranilice-stolice' },
 ]
 
 export default function HomePage() {
+  const router = useRouter()
+  const { user, loadFromStorage } = useAuthStore()
   const [featured, setFeatured] = useState<Product[]>([])
   const [heroImage, setHeroImage] = useState<string | null>(null)
   const [loadingFeatured, setLoadingFeatured] = useState(true)
 
   useEffect(() => {
+    loadFromStorage()
     productsApi.getFeatured()
       .then(res => setFeatured(res.data))
       .catch(() => {})
       .finally(() => setLoadingFeatured(false))
-
     adminApi.getSettings()
       .then(res => { if (res.data.heroImage) setHeroImage(res.data.heroImage) })
       .catch(() => {})
   }, [])
+
+  // If logged in, "Kreiraj listu" goes to moja-lista
+  const handleKreirajListu = (e: React.MouseEvent) => {
+    if (user) {
+      e.preventDefault()
+      router.push('/moja-lista')
+    }
+  }
 
   return (
     <>
@@ -53,19 +82,17 @@ export default function HomePage() {
               <span>🎀</span> Baby lista za svaku prigodu
             </div>
             <h1 className="text-5xl sm:text-6xl lg:text-7xl text-charcoal mb-6 fade-up">
-              Tvoja savršena
-              <br />
+              Tvoja savršena<br />
               <span className="italic text-rose font-serif">bebina lista</span>
             </h1>
             <p className="text-lg text-warm-gray max-w-xl mx-auto mb-8 fade-up" style={{ animationDelay: '0.1s' }}>
-              Odaberi što stvarno trebaš. Podijeli s obitelji i prijateljima — 
-              neka pokloni budu točno ono što ti je potrebno.
+              Odaberi što stvarno trebaš. Podijeli s obitelji i prijateljima — neka pokloni budu točno ono što ti je potrebno.
             </p>
 
-            {/* Prigode */}
             <div className="flex flex-wrap justify-center gap-2 mb-10 fade-up" style={{ animationDelay: '0.15s' }}>
               {OCCASIONS.map(o => (
-                <Link key={o.slug} href={`/registracija?occasion=${o.slug}`}
+                <Link key={o.value} href={user ? '/moja-lista' : `/registracija?occasion=${o.value}`}
+                  onClick={user ? handleKreirajListu : undefined}
                   className="flex items-center gap-1.5 px-4 py-2 bg-white/80 border border-blush/40 rounded-full text-sm text-charcoal hover:border-blush-mid hover:bg-white transition-all">
                   {o.emoji} {o.label}
                 </Link>
@@ -73,9 +100,9 @@ export default function HomePage() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center fade-up" style={{ animationDelay: '0.2s' }}>
-              <Link href="/registracija"
+              <Link href={user ? '/moja-lista' : '/registracija'} onClick={handleKreirajListu}
                 className="px-8 py-3.5 bg-rose text-white font-medium rounded-full text-lg hover:bg-rose/90 transition-all hover:shadow-lg hover:shadow-rose/20 hover:-translate-y-0.5">
-                Kreiraj svoju listu
+                {user ? 'Moje liste' : 'Kreiraj svoju listu'}
               </Link>
               <Link href="/katalog"
                 className="px-8 py-3.5 bg-white text-charcoal font-medium rounded-full text-lg border border-blush hover:border-blush-mid transition-all">
@@ -98,7 +125,6 @@ export default function HomePage() {
                   Svi proizvodi <ArrowRight size={14} />
                 </Link>
               </div>
-
               {loadingFeatured ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                   {Array.from({ length: 4 }).map((_, i) => (
@@ -125,15 +151,11 @@ export default function HomePage() {
         {/* Kako funkcionira */}
         <section className="py-20 px-4">
           <div className="max-w-5xl mx-auto">
-            <h2 className="text-3xl sm:text-4xl text-center text-charcoal mb-4">
-              Jednostavno kao <em>jedan, dva, tri</em>
-            </h2>
-            <p className="text-center text-warm-gray mb-14 max-w-lg mx-auto">
-              Za samo nekoliko minuta imaš svoju listu spremu za dijeljenje
-            </p>
+            <h2 className="text-3xl sm:text-4xl text-center text-charcoal mb-4">Jednostavno kao <em>jedan, dva, tri</em></h2>
+            <p className="text-center text-warm-gray mb-14 max-w-lg mx-auto">Za samo nekoliko minuta imaš svoju listu spremu za dijeljenje</p>
             <div className="grid sm:grid-cols-3 gap-8">
               {[
-                { icon: <Heart className="text-rose" size={28} />, num: '01', title: 'Odaberi prigodu', desc: 'Kreiraj listu za rođenje, rođendan, krstitke ili krimu. Odaberi proizvode iz kataloga.' },
+                { icon: <Heart className="text-rose" size={28} />, num: '01', title: 'Odaberi prigodu', desc: 'Kreiraj listu za rođenje ili rođendan. Odaberi proizvode iz kataloga.' },
                 { icon: <Share2 className="text-sage" size={28} />, num: '02', title: 'Podijeli link', desc: 'Svaka lista dobiva jedinstveni link. Pošalji ga obitelji i prijateljima — bez potrebe za prijavom.' },
                 { icon: <Gift className="text-gold" size={28} />, num: '03', title: 'Primaj savršene poklone', desc: 'Prijatelji vide što je slobodno, rezerviraju upisivanjem svog imena i kupuju direktno iz shopa.' },
               ].map((step, i) => (
@@ -150,25 +172,14 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Kategorije */}
+        {/* Sve kategorije */}
         <section className="py-16 px-4 bg-white/50">
           <div className="max-w-5xl mx-auto">
-            <h2 className="text-3xl sm:text-4xl text-center text-charcoal mb-12">
-              Sve što ti treba, na jednom mjestu
-            </h2>
+            <h2 className="text-3xl sm:text-4xl text-center text-charcoal mb-12">Sve što ti treba, na jednom mjestu</h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[
-                { emoji: '🛒', name: 'Kolica', slug: 'kolica' },
-                { emoji: '🚗', name: 'Autosjedalice', slug: 'autosjedalice' },
-                { emoji: '🛏️', name: 'Kod kuće', slug: 'kreveti-vrtici' },
-                { emoji: '🧸', name: 'Igračke', slug: 'baby-igracke' },
-                { emoji: '🍼', name: 'Hranjenje', slug: 'hranjenje' },
-                { emoji: '👶', name: 'Odjeća', slug: 'kompleti-odjeca' },
-                { emoji: '🤱', name: 'Nosiljke', slug: 'nosiljke-nosiljke' },
-                { emoji: '💝', name: 'Za mame', slug: 'za-mame' },
-              ].map(cat => (
+              {ALL_CATEGORIES.map(cat => (
                 <Link key={cat.slug} href={`/katalog?kategorija=${cat.slug}`}
-                  className="group p-5 bg-white rounded-2xl border border-blush/30 hover:border-blush-mid hover:shadow-md transition-all text-center">
+                  className="group p-4 bg-white rounded-2xl border border-blush/30 hover:border-blush-mid hover:shadow-md transition-all text-center">
                   <span className="text-3xl block mb-2">{cat.emoji}</span>
                   <span className="text-sm font-medium text-charcoal group-hover:text-rose transition-colors">{cat.name}</span>
                 </Link>
@@ -191,7 +202,8 @@ export default function HomePage() {
               <p className="text-warm-gray mb-8 max-w-md mx-auto">Kreiraj listu za svaku posebnu priliku</p>
               <div className="flex flex-wrap gap-3 justify-center">
                 {OCCASIONS.map(o => (
-                  <Link key={o.slug} href={`/registracija?occasion=${o.slug}`}
+                  <Link key={o.value} href={user ? '/moja-lista' : `/registracija?occasion=${o.value}`}
+                    onClick={user ? handleKreirajListu : undefined}
                     className="flex items-center gap-2 px-5 py-2.5 bg-white text-charcoal rounded-full text-sm font-medium border border-blush hover:border-rose hover:text-rose transition-all">
                     {o.emoji} {o.label}
                   </Link>

@@ -5,9 +5,7 @@ import Navbar from '@/components/Navbar'
 import { adminApi, productsApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
 import { Product, AdminUser } from '@/types'
-import { RefreshCw, CheckCircle, XCircle, Clock, Package, Users, List, Gift, Search, Image, Star, StarOff, Shield } from 'lucide-react'
-import { format } from 'date-fns'
-import { hr } from 'date-fns/locale'
+import { RefreshCw, Search, Shield, X } from 'lucide-react'
 import clsx from 'clsx'
 
 type Tab = 'overview' | 'users' | 'scraper' | 'featured' | 'settings'
@@ -17,6 +15,7 @@ export default function AdminPage() {
   const { user, isLoading, loadFromStorage } = useAuthStore()
   const [tab, setTab] = useState<Tab>('overview')
   const [stats, setStats] = useState<any>(null)
+  const [recentLists, setRecentLists] = useState<any[]>([])
   const [shops, setShops] = useState<any[]>([])
   const [users, setUsers] = useState<AdminUser[]>([])
   const [usersTotal, setUsersTotal] = useState(0)
@@ -30,6 +29,7 @@ export default function AdminPage() {
   const [toast, setToast] = useState<string | null>(null)
   const [heroUrl, setHeroUrl] = useState('')
   const [heroSaving, setHeroSaving] = useState(false)
+  const [selectedUserList, setSelectedUserList] = useState<any>(null)
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000) }
 
@@ -44,6 +44,10 @@ export default function AdminPage() {
     adminApi.getShops().then(r => setShops(r.data)).catch(() => {})
     adminApi.getFeatured().then(r => setFeatured(r.data)).catch(() => {})
     adminApi.getSettings().then(r => { setSettings(r.data); setHeroUrl(r.data.heroImage || '') }).catch(() => {})
+    // Load recent users lists for overview
+    adminApi.getUsers({ page: 1 }).then(r => {
+      setRecentLists(r.data.users || [])
+    }).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -64,7 +68,7 @@ export default function AdminPage() {
       await adminApi.triggerScrape(slug)
       showToast(`Scraping pokrenut za ${slug}!`)
       setTimeout(() => adminApi.getShops().then(r => setShops(r.data)), 3000)
-    } catch { showToast('Greška pri pokretanju') }
+    } catch { showToast('Greška') }
     finally { setTimeout(() => setScraping(p => ({ ...p, [slug]: false })), 3000) }
   }
 
@@ -73,22 +77,12 @@ export default function AdminPage() {
     if (existing) {
       await adminApi.removeFeatured(existing.id)
       setFeatured(f => f.filter(x => x.id !== existing.id))
-      showToast('Uklonjeno iz istaknutih')
+      showToast('Uklonjeno')
     } else {
       const res = await adminApi.addFeatured(product.id)
       setFeatured(f => [...f, res.data])
-      showToast('Dodano u istaknute! ⭐')
+      showToast('Dodano! ⭐')
     }
-  }
-
-  const handleSaveHero = async () => {
-    setHeroSaving(true)
-    try {
-      await adminApi.setSetting('heroImage', heroUrl)
-      setSettings(s => ({ ...s, heroImage: heroUrl }))
-      showToast('Hero slika spremljena!')
-    } catch { showToast('Greška pri spremanju') }
-    finally { setHeroSaving(false) }
   }
 
   const handleRoleToggle = async (u: AdminUser) => {
@@ -96,6 +90,13 @@ export default function AdminPage() {
     await adminApi.setUserRole(u.id, newRole)
     setUsers(prev => prev.map(x => x.id === u.id ? { ...x, role: newRole as any } : x))
     showToast(`${u.name} je sada ${newRole}`)
+  }
+
+  const loadUserDetail = async (userId: string) => {
+    try {
+      const res = await adminApi.getUser(userId)
+      setSelectedUserList(res.data)
+    } catch { showToast('Greška pri učitavanju') }
   }
 
   const TABS = [
@@ -123,7 +124,6 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* Tabs */}
           <div className="flex gap-1 bg-white rounded-2xl p-1 border border-blush/30 mb-8 overflow-x-auto">
             {TABS.map(t => (
               <button key={t.key} onClick={() => setTab(t.key as Tab)}
@@ -135,20 +135,83 @@ export default function AdminPage() {
           </div>
 
           {/* OVERVIEW */}
-          {tab === 'overview' && stats && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {[
-                { icon: '👥', label: 'Korisnici', value: stats.usersCount },
-                { icon: '📋', label: 'Liste', value: stats.listsCount },
-                { icon: '📦', label: 'Proizvodi', value: stats.productsCount },
-                { icon: '🎁', label: 'Rezervacije', value: stats.reservationsCount },
-              ].map((card, i) => (
-                <div key={i} className="bg-white rounded-2xl p-5 border border-blush/30">
-                  <div className="text-3xl mb-2">{card.icon}</div>
-                  <p className="text-2xl font-serif text-charcoal">{card.value.toLocaleString('hr-HR')}</p>
-                  <p className="text-xs text-warm-gray mt-0.5">{card.label}</p>
+          {tab === 'overview' && (
+            <div className="space-y-6">
+              {stats && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {[
+                    { icon: '👥', label: 'Korisnici', value: stats.usersCount },
+                    { icon: '📋', label: 'Liste', value: stats.listsCount },
+                    { icon: '📦', label: 'Proizvodi', value: stats.productsCount },
+                    { icon: '🎁', label: 'Rezervacije', value: stats.reservationsCount },
+                  ].map((card, i) => (
+                    <div key={i} className="bg-white rounded-2xl p-5 border border-blush/30">
+                      <div className="text-3xl mb-2">{card.icon}</div>
+                      <p className="text-2xl font-serif text-charcoal">{card.value?.toLocaleString('hr-HR')}</p>
+                      <p className="text-xs text-warm-gray mt-0.5">{card.label}</p>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
+
+              {/* Korisnici i njihove liste */}
+              <div className="bg-white rounded-2xl border border-blush/30 p-5">
+                <h2 className="font-serif text-xl text-charcoal mb-4">Zadnji korisnici i njihove liste</h2>
+                <div className="space-y-3">
+                  {recentLists.slice(0, 10).map((u: any) => (
+                    <div key={u.id} className="flex items-center gap-3 p-3 border border-blush/20 rounded-2xl">
+                      <div className="w-9 h-9 bg-blush/40 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-sm font-medium text-rose">{u.name?.charAt(0)?.toUpperCase()}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-charcoal">{u.name}</p>
+                        <p className="text-xs text-warm-gray">{u.email} · {u._count?.lists || 0} lista</p>
+                      </div>
+                      <button
+                        onClick={() => loadUserDetail(u.id)}
+                        className="text-xs px-3 py-1.5 bg-sage-light/60 text-sage rounded-full hover:bg-sage-light transition-colors flex-shrink-0"
+                      >
+                        Vidi liste
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* User detail modal */}
+              {selectedUserList && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-charcoal/30 backdrop-blur-sm">
+                  <div className="bg-white rounded-3xl w-full max-w-2xl p-6 shadow-2xl max-h-[80vh] overflow-y-auto">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="font-serif text-xl">Liste korisnika: {selectedUserList.name}</h3>
+                      <button onClick={() => setSelectedUserList(null)} className="p-1.5 hover:bg-cream rounded-full">
+                        <X size={18} className="text-warm-gray" />
+                      </button>
+                    </div>
+                    {selectedUserList.lists?.length === 0 ? (
+                      <p className="text-warm-gray text-sm text-center py-8">Korisnik nema lista.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {selectedUserList.lists?.map((list: any) => (
+                          <a key={list.id} href={`/lista/${list.shareSlug}`} target="_blank"
+                            className="block p-4 border border-blush/30 rounded-2xl hover:border-blush-mid transition-colors">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="font-medium text-charcoal">{list.name}</p>
+                                <p className="text-xs text-warm-gray mt-0.5">{list._count?.items || 0} stavki</p>
+                              </div>
+                              <span className="text-xs text-rose">/lista/{list.shareSlug.slice(0, 8)}...</span>
+                            </div>
+                            {list.items?.some((i: any) => i.reservation) && (
+                              <p className="text-xs text-sage mt-2">✓ {list.items.filter((i: any) => i.reservation).length} rezervirano</p>
+                            )}
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -173,23 +236,23 @@ export default function AdminPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-medium text-charcoal">{u.name}</p>
-                        {u.role === 'ADMIN' && (
-                          <span className="px-2 py-0.5 bg-rose/10 text-rose text-xs rounded-full font-medium">Admin</span>
-                        )}
+                        {u.role === 'ADMIN' && <span className="px-2 py-0.5 bg-rose/10 text-rose text-xs rounded-full font-medium">Admin</span>}
                       </div>
                       <p className="text-sm text-warm-gray">{u.email}</p>
-                      <div className="flex items-center gap-3 mt-1 flex-wrap">
-                        <span className="text-xs text-warm-gray/60">{u._count.lists} lista</span>
-                        {u.dueDate && <span className="text-xs text-warm-gray/60">Termin: {format(new Date(u.dueDate), 'd. MMM yyyy.', { locale: hr })}</span>}
-                        <span className="text-xs text-warm-gray/60">{format(new Date(u.createdAt), 'd. MMM yyyy.', { locale: hr })}</span>
-                      </div>
+                      <p className="text-xs text-warm-gray/60 mt-0.5">{u._count.lists} lista · {new Date(u.createdAt).toLocaleDateString('hr-HR')}</p>
                     </div>
-                    <button onClick={() => handleRoleToggle(u)}
-                      className={clsx('flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
-                        u.role === 'ADMIN' ? 'bg-rose/10 text-rose hover:bg-rose/20' : 'bg-sage-light/60 text-sage hover:bg-sage-light')}>
-                      <Shield size={12} />
-                      {u.role === 'ADMIN' ? 'Ukloni admin' : 'Postavi admin'}
-                    </button>
+                    <div className="flex gap-2">
+                      <button onClick={() => loadUserDetail(u.id)}
+                        className="px-3 py-1.5 text-xs font-medium bg-sage-light/60 text-sage rounded-full hover:bg-sage-light transition-colors">
+                        Vidi liste
+                      </button>
+                      <button onClick={() => handleRoleToggle(u)}
+                        className={clsx('flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                          u.role === 'ADMIN' ? 'bg-rose/10 text-rose hover:bg-rose/20' : 'bg-sage-light/60 text-sage hover:bg-sage-light')}>
+                        <Shield size={12} />
+                        {u.role === 'ADMIN' ? 'Ukloni admin' : 'Postavi admin'}
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -202,6 +265,34 @@ export default function AdminPage() {
                     className="px-4 py-2 border border-blush/40 rounded-full text-sm disabled:opacity-40">Sljedeća →</button>
                 </div>
               )}
+              {selectedUserList && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-charcoal/30 backdrop-blur-sm">
+                  <div className="bg-white rounded-3xl w-full max-w-2xl p-6 shadow-2xl max-h-[80vh] overflow-y-auto">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="font-serif text-xl">Liste: {selectedUserList.name}</h3>
+                      <button onClick={() => setSelectedUserList(null)} className="p-1.5 hover:bg-cream rounded-full"><X size={18} className="text-warm-gray" /></button>
+                    </div>
+                    {selectedUserList.lists?.length === 0 ? (
+                      <p className="text-warm-gray text-sm text-center py-8">Korisnik nema lista.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {selectedUserList.lists?.map((list: any) => (
+                          <a key={list.id} href={`/lista/${list.shareSlug}`} target="_blank"
+                            className="block p-4 border border-blush/30 rounded-2xl hover:border-blush-mid transition-colors">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="font-medium text-charcoal">{list.name}</p>
+                                <p className="text-xs text-warm-gray mt-0.5">{list._count?.items || 0} stavki</p>
+                              </div>
+                              <span className="text-xs text-rose">/lista/{list.shareSlug.slice(0, 8)}...</span>
+                            </div>
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -212,25 +303,11 @@ export default function AdminPage() {
                 <div key={shop.id} className="bg-white rounded-2xl border border-blush/30 p-5">
                   <div className="flex items-center justify-between gap-4 flex-wrap">
                     <div className="flex items-center gap-3">
-                      <div className={clsx('w-2.5 h-2.5 rounded-full flex-shrink-0',
-                        shop.lastStatus === 'success' ? 'bg-sage' : shop.lastStatus === 'error' ? 'bg-rose' :
-                        shop.lastStatus === 'running' ? 'bg-gold animate-pulse' : 'bg-warm-gray/30')} />
+                      <div className={clsx('w-2.5 h-2.5 rounded-full',
+                        shop.lastStatus === 'success' ? 'bg-sage' : shop.lastStatus === 'error' ? 'bg-rose' : 'bg-warm-gray/30')} />
                       <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-medium text-charcoal">{shop.name}</h3>
-                          <a href={shop.baseUrl} target="_blank" className="text-xs text-warm-gray hover:text-sage">{shop.baseUrl}</a>
-                        </div>
-                        <div className="flex items-center gap-3 mt-1 flex-wrap">
-                          <span className="text-xs text-warm-gray"><Package size={10} className="inline mr-1" />{shop.productsCount.toLocaleString('hr-HR')} proizvoda</span>
-                          {shop.lastRun && <span className="text-xs text-warm-gray"><Clock size={10} className="inline mr-1" />{format(new Date(shop.lastRun), 'd. MMM HH:mm', { locale: hr })}</span>}
-                          {shop.lastStatus && (
-                            <span className={clsx('text-xs font-medium',
-                              shop.lastStatus === 'success' ? 'text-sage' : shop.lastStatus === 'error' ? 'text-rose' : 'text-gold')}>
-                              {shop.lastStatus === 'success' ? '✓' : shop.lastStatus === 'error' ? '✗' : '⟳'} {shop.lastStatus}
-                            </span>
-                          )}
-                        </div>
-                        {shop.errorMsg && <p className="text-xs text-rose/70 mt-1">{shop.errorMsg}</p>}
+                        <h3 className="font-medium text-charcoal">{shop.name}</h3>
+                        <p className="text-xs text-warm-gray">{shop.productsCount?.toLocaleString('hr-HR')} proizvoda · {shop.lastStatus || 'nije pokrenut'}</p>
                       </div>
                     </div>
                     <button onClick={() => handleScrape(shop.slug)} disabled={scraping[shop.slug]}
@@ -242,7 +319,7 @@ export default function AdminPage() {
                 </div>
               ))}
               <div className="p-4 bg-cream rounded-2xl text-sm text-warm-gray">
-                💡 Scraper automatski radi svake noći u <strong>02:00</strong>. Ručno pokretanje traje 10-30 minuta.
+                💡 Scraper automatski radi svake noći u <strong>02:00</strong>.
               </div>
             </div>
           )}
@@ -252,7 +329,6 @@ export default function AdminPage() {
             <div>
               <div className="mb-6">
                 <h2 className="font-serif text-xl text-charcoal mb-2">Istaknuti proizvodi ({featured.length}/12)</h2>
-                <p className="text-sm text-warm-gray">Istaknuti proizvodi prikazuju se na početnoj stranici.</p>
               </div>
               {featured.length > 0 && (
                 <div className="mb-8">
@@ -260,13 +336,13 @@ export default function AdminPage() {
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                     {featured.map((f: any) => (
                       <div key={f.id} className="bg-white rounded-2xl border border-gold/30 p-3 relative">
-                        <div className="absolute top-2 right-2">
-                          <button onClick={() => adminApi.removeFeatured(f.id).then(() => setFeatured(prev => prev.filter(x => x.id !== f.id))).then(() => showToast('Uklonjeno'))}
-                            className="p-1 bg-rose/10 text-rose rounded-full hover:bg-rose/20 transition-colors"><X size={12} /></button>
-                        </div>
-                        {f.product.imageUrl && <img src={f.product.imageUrl} alt="" className="w-full h-24 object-contain mb-2" />}
-                        <p className="text-xs font-medium text-charcoal line-clamp-2">{f.product.name}</p>
-                        <p className="text-xs text-rose mt-0.5">{f.product.price.toFixed(2)} €</p>
+                        <button onClick={() => adminApi.removeFeatured(f.id).then(() => setFeatured(prev => prev.filter(x => x.id !== f.id))).then(() => showToast('Uklonjeno'))}
+                          className="absolute top-2 right-2 p-1 bg-rose/10 text-rose rounded-full hover:bg-rose/20">
+                          <X size={12} />
+                        </button>
+                        {f.product?.imageUrl && <img src={f.product.imageUrl} alt="" className="w-full h-24 object-contain mb-2" />}
+                        <p className="text-xs font-medium text-charcoal line-clamp-2">{f.product?.name}</p>
+                        <p className="text-xs text-rose mt-0.5">{f.product?.price?.toFixed(2)} €</p>
                       </div>
                     ))}
                   </div>
@@ -290,7 +366,7 @@ export default function AdminPage() {
                       <p className="text-xs font-medium text-charcoal line-clamp-2">{product.name}</p>
                       <div className="flex items-center justify-between mt-1">
                         <p className="text-xs text-rose">{product.price.toFixed(2)} €</p>
-                        {isFeatured ? <span className="text-xs text-gold">⭐ Istaknuto</span> : <span className="text-xs text-warm-gray/40">+ Dodaj</span>}
+                        {isFeatured ? <span className="text-xs text-gold">⭐</span> : <span className="text-xs text-warm-gray/40">+</span>}
                       </div>
                     </button>
                   )
@@ -304,7 +380,6 @@ export default function AdminPage() {
             <div className="space-y-6 max-w-2xl">
               <div className="bg-white rounded-2xl border border-blush/30 p-6">
                 <h2 className="font-serif text-xl text-charcoal mb-4">Hero slika</h2>
-                <p className="text-sm text-warm-gray mb-4">URL slike koja se prikazuje na početnoj stranici (hero sekcija).</p>
                 <div className="space-y-3">
                   <input type="url" placeholder="https://..." value={heroUrl} onChange={e => setHeroUrl(e.target.value)}
                     className="w-full px-4 py-3 bg-cream border border-blush/40 rounded-xl text-sm focus:outline-none focus:border-rose" />
@@ -313,28 +388,23 @@ export default function AdminPage() {
                       <img src={heroUrl} alt="Hero preview" className="w-full h-full object-cover" onError={e => (e.currentTarget.style.display = 'none')} />
                     </div>
                   )}
-                  <button onClick={handleSaveHero} disabled={heroSaving}
-                    className="px-5 py-2.5 bg-rose text-white rounded-full text-sm font-medium hover:bg-rose/90 transition-colors disabled:opacity-50">
+                  <button onClick={async () => { setHeroSaving(true); try { await adminApi.setSetting('heroImage', heroUrl); showToast('Spremljeno!') } catch {} finally { setHeroSaving(false) } }}
+                    disabled={heroSaving} className="px-5 py-2.5 bg-rose text-white rounded-full text-sm font-medium hover:bg-rose/90 disabled:opacity-50">
                     {heroSaving ? 'Sprema...' : 'Spremi hero sliku'}
                   </button>
                 </div>
               </div>
-
               <div className="bg-white rounded-2xl border border-blush/30 p-6">
                 <h2 className="font-serif text-xl text-charcoal mb-4">Opće postavke</h2>
                 {[
                   { key: 'siteName', label: 'Naziv stranice', placeholder: 'Bebina Lista' },
-                  { key: 'siteTagline', label: 'Podnaslov', placeholder: 'Baby lista za nove roditelje' },
                   { key: 'contactEmail', label: 'Kontakt email', placeholder: 'info@bebinalista.hr' },
-                ].map(setting => (
-                  <div key={setting.key} className="mb-4">
-                    <label className="block text-xs font-medium text-warm-gray mb-1.5 uppercase tracking-wide">{setting.label}</label>
-                    <div className="flex gap-2">
-                      <input type="text" placeholder={setting.placeholder}
-                        defaultValue={settings[setting.key] || ''}
-                        onBlur={e => adminApi.setSetting(setting.key, e.target.value).then(() => showToast('Spremljeno!')).catch(() => {})}
-                        className="flex-1 px-4 py-2.5 bg-cream border border-blush/40 rounded-xl text-sm focus:outline-none focus:border-rose" />
-                    </div>
+                ].map(s => (
+                  <div key={s.key} className="mb-4">
+                    <label className="block text-xs font-medium text-warm-gray mb-1.5 uppercase tracking-wide">{s.label}</label>
+                    <input type="text" placeholder={s.placeholder} defaultValue={settings[s.key] || ''}
+                      onBlur={e => adminApi.setSetting(s.key, e.target.value).then(() => showToast('Spremljeno!')).catch(() => {})}
+                      className="w-full px-4 py-2.5 bg-cream border border-blush/40 rounded-xl text-sm focus:outline-none focus:border-rose" />
                   </div>
                 ))}
               </div>
@@ -344,14 +414,8 @@ export default function AdminPage() {
       </main>
 
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 bg-charcoal text-white text-sm rounded-full shadow-2xl fade-in">
-          {toast}
-        </div>
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 bg-charcoal text-white text-sm rounded-full shadow-2xl fade-in">{toast}</div>
       )}
     </>
   )
-}
-
-function X({ size }: { size: number }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
 }

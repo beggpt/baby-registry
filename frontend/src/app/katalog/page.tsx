@@ -21,10 +21,10 @@ function AddToListModal({ product, lists, onClose, onAdd }: {
       <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl fade-up">
         <div className="flex justify-between items-start mb-4">
           <h3 className="font-serif text-xl text-charcoal">Dodaj na listu</h3>
-          <button onClick={onClose} className="p-1.5 hover:bg-cream rounded-full transition-colors"><X size={18} className="text-warm-gray" /></button>
+          <button onClick={onClose} className="p-1.5 hover:bg-cream rounded-full"><X size={18} className="text-warm-gray" /></button>
         </div>
         <div className="flex gap-3 mb-5 p-3 bg-cream rounded-2xl">
-          <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
+          <div className="w-14 h-14 bg-white rounded-xl flex-shrink-0 overflow-hidden flex items-center justify-center">
             {product.imageUrl ? <img src={product.imageUrl} alt="" className="w-full h-full object-contain p-1" /> : <span className="text-2xl">🍼</span>}
           </div>
           <div className="flex-1 min-w-0">
@@ -53,8 +53,8 @@ function AddToListModal({ product, lists, onClose, onAdd }: {
             <div className="mb-5">
               <label className="block text-xs font-medium text-warm-gray mb-2 uppercase tracking-wide">Prioritet</label>
               <div className="grid grid-cols-3 gap-2">
-                {[{ value: 'HIGH', label: '❤️ Jako želim', cls: 'priority-HIGH' },
-                  { value: 'MEDIUM', label: '🌿 Lijepo bi bilo', cls: 'priority-MEDIUM' },
+                {[{ value: 'HIGH', label: '❤️ Jako', cls: 'priority-HIGH' },
+                  { value: 'MEDIUM', label: '🌿 Srednje', cls: 'priority-MEDIUM' },
                   { value: 'LOW', label: '✨ Luksuz', cls: 'priority-LOW' }].map(p => (
                   <button key={p.value} onClick={() => setPriority(p.value)}
                     className={clsx('px-2 py-2.5 rounded-xl text-xs font-medium transition-all border text-center',
@@ -74,6 +74,14 @@ function AddToListModal({ product, lists, onClose, onAdd }: {
   )
 }
 
+const PRICE_PRESETS = [
+  { label: 'Do 30€', min: '', max: '30' },
+  { label: 'Do 50€', min: '', max: '50' },
+  { label: '50–150€', min: '50', max: '150' },
+  { label: '150–500€', min: '150', max: '500' },
+  { label: '500€+', min: '500', max: '' },
+]
+
 export default function KatalogPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -91,19 +99,16 @@ export default function KatalogPage() {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set())
 
-  // Filteri
   const [query, setQuery] = useState(searchParams.get('q') || '')
   const [categorySlug, setCategorySlug] = useState(searchParams.get('kategorija') || '')
   const [sortBy, setSortBy] = useState('name')
   const [page, setPage] = useState(1)
-  const [minPrice, setMinPrice] = useState<string>('')
-  const [maxPrice, setMaxPrice] = useState<string>('')
+  const [minPrice, setMinPrice] = useState('')
+  const [maxPrice, setMaxPrice] = useState('')
 
   useEffect(() => { loadFromStorage() }, [])
 
-  const showToast = (msg: string) => {
-    setToast(msg); setTimeout(() => setToast(null), 3000)
-  }
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000) }
 
   const fetchProducts = useCallback(async () => {
     setLoading(true)
@@ -117,18 +122,12 @@ export default function KatalogPage() {
       })
       setProducts(res.data.products)
       setPagination(res.data.pagination)
-      if (res.data.priceRange && !minPrice && !maxPrice) {
-        setPriceRange(res.data.priceRange)
-      }
+      if (res.data.priceRange) setPriceRange(res.data.priceRange)
     } catch {} finally { setLoading(false) }
   }, [query, categorySlug, sortBy, page, minPrice, maxPrice])
 
   useEffect(() => { fetchProducts() }, [fetchProducts])
-
-  useEffect(() => {
-    productsApi.getCategories().then(res => setCategories(res.data)).catch(() => {})
-  }, [])
-
+  useEffect(() => { productsApi.getCategories().then(res => setCategories(res.data)).catch(() => {}) }, [])
   useEffect(() => {
     if (!user) return
     listsApi.getAll().then(res => {
@@ -146,7 +145,7 @@ export default function KatalogPage() {
       await listsApi.addItem(listId, selectedProduct.id, priority)
       setListProductIds(prev => new Set([...prev, selectedProduct.id]))
       setSelectedProduct(null)
-      showToast(`"${selectedProduct.name.substring(0, 30)}..." dodano! 💕`)
+      showToast(`Dodano na listu! 💕`)
     } catch (err: any) {
       if (err.response?.status === 409) showToast('Već je na listi!')
       else showToast('Greška. Pokušaj ponovo.')
@@ -159,21 +158,14 @@ export default function KatalogPage() {
     setSelectedProduct(product)
   }
 
-  const resetFilters = () => {
-    setQuery(''); setCategorySlug(''); setMinPrice(''); setMaxPrice(''); setPage(1)
+  const setPreset = (min: string, max: string) => {
+    setMinPrice(min); setMaxPrice(max); setPage(1)
   }
 
-  const toggleCat = (id: string) => {
-    setExpandedCats(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
+  const isPresetActive = (min: string, max: string) => minPrice === min && maxPrice === max
 
   const filterSidebar = (
     <div className="space-y-6">
-      {/* Kategorije */}
       <div>
         <h3 className="text-xs font-medium text-warm-gray uppercase tracking-wide mb-3">Kategorija</h3>
         <div className="space-y-0.5">
@@ -188,13 +180,14 @@ export default function KatalogPage() {
                 <button onClick={() => { setCategorySlug(cat.slug); setPage(1) }}
                   className={clsx('flex-1 text-left px-3 py-2 rounded-xl text-sm transition-colors',
                     categorySlug === cat.slug ? 'bg-blush/50 text-rose font-medium' : 'text-charcoal hover:bg-cream')}>
-                  <span>{cat.name}</span>
+                  {cat.name}
                   <span className={clsx('ml-1.5 text-xs', categorySlug === cat.slug ? 'text-rose/60' : 'text-warm-gray/50')}>
                     ({(cat as any).totalCount ?? cat._count?.products ?? 0})
                   </span>
                 </button>
                 {cat.children && cat.children.length > 0 && (
-                  <button onClick={() => toggleCat(cat.id)} className="p-1 text-warm-gray hover:text-charcoal">
+                  <button onClick={() => setExpandedCats(prev => { const n = new Set(prev); n.has(cat.id) ? n.delete(cat.id) : n.add(cat.id); return n })}
+                    className="p-1 text-warm-gray hover:text-charcoal">
                     {expandedCats.has(cat.id) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   </button>
                 )}
@@ -211,44 +204,36 @@ export default function KatalogPage() {
         </div>
       </div>
 
-      {/* Cijena */}
       <div>
-        <h3 className="text-xs font-medium text-warm-gray uppercase tracking-wide mb-3">Raspon cijene</h3>
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-xs text-warm-gray mb-1 block">Od (€)</label>
-              <input type="number" placeholder={String(Math.floor(priceRange.min))} value={minPrice}
-                onChange={e => { setMinPrice(e.target.value); setPage(1) }}
-                className="w-full px-3 py-2 bg-white border border-blush/40 rounded-lg text-sm focus:outline-none focus:border-rose" />
-            </div>
-            <div>
-              <label className="text-xs text-warm-gray mb-1 block">Do (€)</label>
-              <input type="number" placeholder={String(Math.ceil(priceRange.max))} value={maxPrice}
-                onChange={e => { setMaxPrice(e.target.value); setPage(1) }}
-                className="w-full px-3 py-2 bg-white border border-blush/40 rounded-lg text-sm focus:outline-none focus:border-rose" />
-            </div>
-          </div>
-          {/* Brzi filteri cijena */}
-          <div className="flex flex-wrap gap-1.5">
-            {[{ label: 'Do 50€', max: '50' }, { label: '50–150€', min: '50', max: '150' },
-              { label: '150–500€', min: '150', max: '500' }, { label: '500€+', min: '500' }].map(range => (
-              <button key={range.label}
-                onClick={() => { setMinPrice(range.min || ''); setMaxPrice(range.max || ''); setPage(1) }}
-                className={clsx('px-2.5 py-1 rounded-full text-xs transition-colors border',
-                  minPrice === (range.min || '') && maxPrice === (range.max || '')
-                    ? 'bg-rose text-white border-rose'
-                    : 'border-blush/40 text-warm-gray hover:border-blush-mid')}>
-                {range.label}
-              </button>
-            ))}
-          </div>
-          {(minPrice || maxPrice) && (
-            <button onClick={() => { setMinPrice(''); setMaxPrice(''); setPage(1) }} className="text-xs text-rose hover:underline">
-              Ukloni filter cijene
+        <h3 className="text-xs font-medium text-warm-gray uppercase tracking-wide mb-3">Cijena</h3>
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {PRICE_PRESETS.map(p => (
+            <button key={p.label} onClick={() => isPresetActive(p.min, p.max) ? setPreset('', '') : setPreset(p.min, p.max)}
+              className={clsx('px-2.5 py-1 rounded-full text-xs transition-colors border',
+                isPresetActive(p.min, p.max) ? 'bg-rose text-white border-rose' : 'border-blush/40 text-warm-gray hover:border-blush-mid')}>
+              {p.label}
             </button>
-          )}
+          ))}
         </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-xs text-warm-gray mb-1 block">Od (€)</label>
+            <input type="number" placeholder="0" value={minPrice}
+              onChange={e => { setMinPrice(e.target.value); setPage(1) }}
+              className="w-full px-3 py-2 bg-white border border-blush/40 rounded-lg text-sm focus:outline-none focus:border-rose" />
+          </div>
+          <div>
+            <label className="text-xs text-warm-gray mb-1 block">Do (€)</label>
+            <input type="number" placeholder="∞" value={maxPrice}
+              onChange={e => { setMaxPrice(e.target.value); setPage(1) }}
+              className="w-full px-3 py-2 bg-white border border-blush/40 rounded-lg text-sm focus:outline-none focus:border-rose" />
+          </div>
+        </div>
+        {(minPrice || maxPrice) && (
+          <button onClick={() => { setMinPrice(''); setMaxPrice(''); setPage(1) }} className="text-xs text-rose hover:underline mt-2 block">
+            Ukloni filter cijene
+          </button>
+        )}
       </div>
     </div>
   )
@@ -283,25 +268,20 @@ export default function KatalogPage() {
           </div>
 
           <div className="flex gap-8">
-            {/* Desktop sidebar */}
             <aside className="hidden sm:block w-60 flex-shrink-0 sticky top-24 self-start max-h-[calc(100vh-7rem)] overflow-y-auto pb-4">
               {filterSidebar}
             </aside>
 
-            {/* Mobile filters */}
             {filtersOpen && (
               <div className="sm:hidden fixed inset-0 z-40 bg-charcoal/20" onClick={() => setFiltersOpen(false)}>
                 <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-6 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                   <h3 className="font-serif text-lg mb-4">Filteri</h3>
                   {filterSidebar}
-                  <button onClick={() => setFiltersOpen(false)} className="mt-4 w-full py-3 bg-charcoal text-white rounded-full text-sm font-medium">
-                    Primijeni
-                  </button>
+                  <button onClick={() => setFiltersOpen(false)} className="mt-4 w-full py-3 bg-charcoal text-white rounded-full text-sm font-medium">Primijeni</button>
                 </div>
               </div>
             )}
 
-            {/* Products */}
             <div className="flex-1 min-w-0">
               {loading ? (
                 <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -320,16 +300,16 @@ export default function KatalogPage() {
                   <span className="text-5xl block mb-4">🔍</span>
                   <h3 className="font-serif text-xl text-charcoal mb-2">Nema rezultata</h3>
                   <p className="text-warm-gray text-sm mb-4">Pokušaj s drugačijim filterima</p>
-                  <button onClick={resetFilters} className="px-5 py-2 bg-blush/40 text-charcoal rounded-full text-sm hover:bg-blush transition-colors">
+                  <button onClick={() => { setQuery(''); setCategorySlug(''); setMinPrice(''); setMaxPrice(''); setPage(1) }}
+                    className="px-5 py-2 bg-blush/40 text-charcoal rounded-full text-sm hover:bg-blush transition-colors">
                     Resetiraj filtere
                   </button>
                 </div>
               ) : (
                 <>
                   <p className="text-sm text-warm-gray mb-4">
-                    {pagination.total.toLocaleString('hr-HR')} {pagination.total === 1 ? 'proizvod' : 'proizvoda'}
+                    {pagination.total.toLocaleString('hr-HR')} proizvoda
                     {query && <> za "<strong>{query}</strong>"</>}
-                    {categorySlug && <> · {categories.find(c => c.slug === categorySlug)?.name}</>}
                     {(minPrice || maxPrice) && <> · {minPrice || '0'}€ – {maxPrice || '∞'}€</>}
                   </p>
                   <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -365,9 +345,7 @@ export default function KatalogPage() {
       )}
 
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 bg-charcoal text-white text-sm rounded-full shadow-2xl fade-in">
-          {toast}
-        </div>
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 bg-charcoal text-white text-sm rounded-full shadow-2xl fade-in">{toast}</div>
       )}
     </>
   )
