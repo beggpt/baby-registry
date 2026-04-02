@@ -6,47 +6,46 @@ import Image from "next/image";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  parentId: string | null;
+}
+
 interface Product {
   id: string;
   name: string;
-  price: number | null;
+  price: number;
   imageUrl: string | null;
-  url: string;
-  category: { id: string; name: string; slug: string; parentId: string | null } | null;
-}
-
-interface ListItem {
-  id: string;
-  quantity: number;
-  priority: number;
-  notes: string | null;
-  reservation: Reservation | Reservation[] | null;
-  product: Product;
+  productUrl: string;
+  category: Category | null;
 }
 
 interface Reservation {
   id: string;
   reservedBy: string;
-  quantity: number;
+  status: string;
+}
+
+interface ListItem {
+  id: string;
+  priority: string;
+  note: string | null;
+  reservation: Reservation | null;
+  product: Product;
 }
 
 interface BabyList {
   id: string;
   name: string;
   description: string | null;
-  babyName: string | null;
-  dueDate: string | null;
-  slug: string;
+  occasion: string | null;
+  shareSlug: string;
   items: ListItem[];
   user: {
     name: string;
   };
-}
-
-function getReservedQuantity(reservation: Reservation | Reservation[] | null | undefined): number {
-  if (!reservation) return 0;
-  if (Array.isArray(reservation)) return reservation.reduce((sum, r) => sum + r.quantity, 0);
-  return reservation.quantity;
 }
 
 function ReservationModal({
@@ -59,12 +58,8 @@ function ReservationModal({
   onSuccess: () => void;
 }) {
   const [name, setName] = useState("");
-  const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const reserved = getReservedQuantity(item.reservation);
-  const available = item.quantity - reserved;
 
   async function handleReserve() {
     if (!name.trim()) {
@@ -80,12 +75,11 @@ function ReservationModal({
         body: JSON.stringify({
           listItemId: item.id,
           reservedBy: name.trim(),
-          quantity,
         }),
       });
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.message || "Greška pri rezervaciji.");
+        throw new Error(data.message || data.error || "Greška pri rezervaciji.");
       }
       onSuccess();
     } catch (err: unknown) {
@@ -114,29 +108,11 @@ function ReservationModal({
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleReserve()}
             placeholder="Upišite vaše ime..."
             className="w-full border border-rose-200 rounded-xl px-4 py-2.5 text-rose-900 placeholder-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-300"
           />
         </div>
-
-        {available > 1 && (
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-rose-700 mb-1">
-              Količina
-            </label>
-            <select
-              value={quantity}
-              onChange={(e) => setQuantity(Number(e.target.value))}
-              className="w-full border border-rose-200 rounded-xl px-4 py-2.5 text-rose-900 focus:outline-none focus:ring-2 focus:ring-rose-300"
-            >
-              {Array.from({ length: available }, (_, i) => i + 1).map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
 
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
@@ -160,6 +136,18 @@ function ReservationModal({
   );
 }
 
+const priorityLabel: Record<string, string> = {
+  HIGH: "Visoko",
+  MEDIUM: "Srednje",
+  LOW: "Nisko",
+};
+
+const priorityColor: Record<string, string> = {
+  HIGH: "bg-rose-100 text-rose-600",
+  MEDIUM: "bg-amber-100 text-amber-700",
+  LOW: "bg-green-100 text-green-700",
+};
+
 function ItemCard({
   item,
   onReserve,
@@ -167,29 +155,16 @@ function ItemCard({
   item: ListItem;
   onReserve: () => void;
 }) {
-  const reserved = getReservedQuantity(item.reservation);
-  const available = item.quantity - reserved;
-  const fullyReserved = available <= 0;
-
-  const priorityLabel: Record<number, string> = {
-    1: "Nisko",
-    2: "Srednje",
-    3: "Visoko",
-  };
-  const priorityColor: Record<number, string> = {
-    1: "bg-sage-100 text-sage-700",
-    2: "bg-amber-100 text-amber-700",
-    3: "bg-rose-100 text-rose-600",
-  };
+  const isReserved = !!item.reservation;
 
   return (
     <div
       className={`group relative bg-white rounded-2xl shadow-sm border border-rose-100 overflow-hidden transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${
-        fullyReserved ? "opacity-70" : "cursor-pointer"
+        !isReserved ? "cursor-pointer" : ""
       }`}
       onClick={() => {
-        if (!fullyReserved) {
-          window.open(item.product.url, "_blank", "noopener,noreferrer");
+        if (!isReserved) {
+          window.open(item.product.productUrl, "_blank", "noopener,noreferrer");
         }
       }}
     >
@@ -211,22 +186,21 @@ function ItemCard({
         )}
 
         {/* Priority badge */}
-        {item.priority > 0 && (
+        {item.priority && (
           <span
             className={`absolute top-3 left-3 text-xs font-medium px-2 py-0.5 rounded-full ${
-              priorityColor[item.priority] ||
-              "bg-gray-100 text-gray-600"
+              priorityColor[item.priority] || "bg-gray-100 text-gray-600"
             }`}
           >
-            {priorityLabel[item.priority] || ""}
+            {priorityLabel[item.priority] || item.priority}
           </span>
         )}
 
-        {/* Fully reserved overlay */}
-        {fullyReserved && (
+        {/* Reserved overlay */}
+        {isReserved && (
           <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
             <span className="bg-green-100 text-green-700 font-semibold px-4 py-1.5 rounded-full text-sm">
-              ✓ Rezervirano
+              ✓ Rezervirano od: {item.reservation!.reservedBy}
             </span>
           </div>
         )}
@@ -238,38 +212,26 @@ function ItemCard({
           {item.product.name}
         </h3>
 
-        {item.product.price && (
-          <p className="text-rose-500 font-semibold text-sm mb-2">
-            {item.product.price.toFixed(2)} €
-          </p>
-        )}
+        <p className="text-rose-500 font-semibold text-sm mb-2">
+          {item.product.price.toFixed(2)} €
+        </p>
 
-        {item.notes && (
+        {item.note && (
           <p className="text-xs text-rose-400 italic mb-3 line-clamp-2">
-            {item.notes}
+            {item.note}
           </p>
         )}
 
-        {/* Quantity info */}
-        <div className="flex items-center justify-between text-xs text-rose-400 mb-3">
-          <span>
-            {reserved > 0
-              ? `${reserved} od ${item.quantity} rezervirano`
-              : `${item.quantity} kom`}
+        {item.product.category && (
+          <span className="inline-block bg-rose-50 text-rose-400 text-xs px-2 py-0.5 rounded-full mb-3">
+            {item.product.category.name}
           </span>
-          {item.product.category && (
-            <span className="bg-rose-50 px-2 py-0.5 rounded-full">
-              {typeof item.product.category === 'object' 
-                ? (item.product.category as { name: string }).name 
-                : item.product.category}
-            </span>
-          )}
-        </div>
+        )}
 
         {/* Actions */}
         <div className="flex gap-2">
           <a
-            href={item.product.url}
+            href={item.product.productUrl}
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
@@ -277,7 +239,7 @@ function ItemCard({
           >
             Pogledaj u shopu →
           </a>
-          {!fullyReserved && (
+          {!isReserved && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -302,7 +264,7 @@ export default function SharedListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedItem, setSelectedItem] = useState<ListItem | null>(null);
-  const [successItem, setSuccessItem] = useState<string | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   async function fetchList() {
     try {
@@ -322,10 +284,10 @@ export default function SharedListPage() {
   }, [slug]);
 
   async function handleReservationSuccess() {
-    if (selectedItem) setSuccessItem(selectedItem.id);
     setSelectedItem(null);
+    setShowSuccess(true);
     await fetchList();
-    setTimeout(() => setSuccessItem(null), 3000);
+    setTimeout(() => setShowSuccess(false), 3000);
   }
 
   if (loading) {
@@ -349,9 +311,7 @@ export default function SharedListPage() {
   }
 
   const totalItems = list.items.length;
-  const reservedItems = list.items.filter(
-    (i) => getReservedQuantity(i.reservation) >= i.quantity
-  ).length;
+  const reservedItems = list.items.filter((i) => !!i.reservation).length;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-rose-50 via-amber-50 to-rose-100">
@@ -370,21 +330,6 @@ export default function SharedListPage() {
         <div className="text-center mb-10">
           <div className="text-5xl mb-4">🎀</div>
           <h1 className="text-3xl font-bold text-rose-800 mb-2">{list.name}</h1>
-          {list.babyName && (
-            <p className="text-rose-500 text-lg mb-1">
-              za bebu <span className="font-semibold">{list.babyName}</span>
-            </p>
-          )}
-          {list.dueDate && (
-            <p className="text-rose-400 text-sm">
-              Očekivani datum:{" "}
-              {new Date(list.dueDate).toLocaleDateString("hr-HR", {
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              })}
-            </p>
-          )}
           {list.description && (
             <p className="text-rose-500 mt-4 max-w-xl mx-auto leading-relaxed">
               {list.description}
@@ -396,7 +341,7 @@ export default function SharedListPage() {
         </div>
 
         {/* Success toast */}
-        {successItem && (
+        {showSuccess && (
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-2xl shadow-lg z-50 text-sm font-medium">
             ✓ Rezervacija uspješna! Hvala ti! 🎉
           </div>
