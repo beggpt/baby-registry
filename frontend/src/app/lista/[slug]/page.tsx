@@ -20,7 +20,7 @@ interface ListItem {
   quantity: number;
   priority: number;
   notes: string | null;
-  reservation: Reservation[];
+  reservation: Reservation[] | null;
   product: Product;
 }
 
@@ -43,7 +43,8 @@ interface BabyList {
   };
 }
 
-function getReservedQuantity(reservation: Reservation[]): number {
+function getReservedQuantity(reservation: Reservation[] | null | undefined): number {
+  if (!reservation) return 0;
   return reservation.reduce((sum, r) => sum + r.quantity, 0);
 }
 
