@@ -72,7 +72,7 @@ function ReservationModal({
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`${API_URL}/api/reservations`, {
+      const res = await fetch(`${API_URL}/reservations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
