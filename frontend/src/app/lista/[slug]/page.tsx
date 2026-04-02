@@ -1,461 +1,430 @@
-'use client'
-import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
-import { publicApi } from '@/lib/api'
-import { BabyList, ListItem } from '@/types'
-import { ExternalLink, Heart, Gift, X, Check, User, MessageSquare } from 'lucide-react'
-import { format, differenceInDays } from 'date-fns'
-import { hr } from 'date-fns/locale'
-import clsx from 'clsx'
+"use client";
 
-// Modal za rezervaciju - korak po korak unos imena
-function ReserveModal({
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import Image from "next/image";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+
+interface Product {
+  id: string;
+  name: string;
+  price: number | null;
+  imageUrl: string | null;
+  url: string;
+  category: string | null;
+}
+
+interface ListItem {
+  id: string;
+  quantity: number;
+  priority: number;
+  notes: string | null;
+  reservations: Reservation[];
+  product: Product;
+}
+
+interface Reservation {
+  id: string;
+  reservedBy: string;
+  quantity: number;
+}
+
+interface BabyList {
+  id: string;
+  name: string;
+  description: string | null;
+  babyName: string | null;
+  dueDate: string | null;
+  slug: string;
+  items: ListItem[];
+  user: {
+    name: string;
+  };
+}
+
+function getReservedQuantity(reservations: Reservation[]): number {
+  return reservations.reduce((sum, r) => sum + r.quantity, 0);
+}
+
+function ReservationModal({
   item,
   onClose,
-  onReserve,
+  onSuccess,
 }: {
-  item: ListItem
-  onClose: () => void
-  onReserve: (itemId: string, name: string, note?: string) => Promise<void>
+  item: ListItem;
+  onClose: () => void;
+  onSuccess: () => void;
 }) {
-  const [name, setName] = useState('')
-  const [note, setNote] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [step, setStep] = useState<'form' | 'success'>('form')
+  const [name, setName] = useState("");
+  const [quantity, setQuantity] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const { product } = item
+  const reserved = getReservedQuantity(item.reservations);
+  const available = item.quantity - reserved;
 
-  const formattedPrice = new Intl.NumberFormat('hr-HR', {
-    style: 'currency',
-    currency: product.currency || 'EUR',
-    minimumFractionDigits: 2,
-  }).format(product.price)
-
-  const handleSubmit = async () => {
-    if (!name.trim()) return
-    setLoading(true)
+  async function handleReserve() {
+    if (!name.trim()) {
+      setError("Molimo unesite vaše ime.");
+      return;
+    }
+    setLoading(true);
+    setError("");
     try {
-      await onReserve(item.id, name.trim(), note.trim() || undefined)
-      setStep('success')
-    } catch {
-      setLoading(false)
+      const res = await fetch(`${API_URL}/api/reservations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          listItemId: item.id,
+          reservedBy: name.trim(),
+          quantity,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Greška pri rezervaciji.");
+      }
+      onSuccess();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Greška pri rezervaciji.");
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-charcoal/40 backdrop-blur-sm fade-in">
-      <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden fade-up">
-        {step === 'form' ? (
-          <>
-            <div className="p-6">
-              <div className="flex justify-between items-start mb-5">
-                <h3 className="font-serif text-xl text-charcoal">Rezerviraj poklon</h3>
-                <button onClick={onClose} className="p-1.5 hover:bg-cream rounded-full transition-colors">
-                  <X size={18} className="text-warm-gray" />
-                </button>
-              </div>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md mx-4">
+        <h3 className="text-xl font-semibold text-rose-800 mb-1">
+          Rezerviraj poklon
+        </h3>
+        <p className="text-sm text-rose-400 mb-6">{item.product.name}</p>
 
-              {/* Proizvod preview */}
-              <div className="flex gap-3 p-3 bg-cream rounded-2xl mb-5">
-                <div className="w-14 h-14 bg-white rounded-xl flex-shrink-0 overflow-hidden flex items-center justify-center">
-                  {product.imageUrl
-                    ? <img src={product.imageUrl} alt="" className="w-full h-full object-contain p-1" />
-                    : <span className="text-2xl">🍼</span>
-                  }
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-charcoal line-clamp-2 leading-snug">{product.name}</p>
-                  <p className="text-sm text-rose font-medium mt-0.5">{formattedPrice}</p>
-                  <p className="text-xs text-warm-gray">{product.shopName}</p>
-                </div>
-              </div>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-rose-700 mb-1">
+            Vaše ime
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Upišite vaše ime..."
+            className="w-full border border-rose-200 rounded-xl px-4 py-2.5 text-rose-900 placeholder-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-300"
+          />
+        </div>
 
-              <div className="space-y-4">
-                {/* Ime */}
-                <div>
-                  <label className="flex items-center gap-1.5 text-xs font-medium text-warm-gray mb-1.5 uppercase tracking-wide">
-                    <User size={11} />
-                    Tvoje ime *
-                  </label>
-                  <input
-                    type="text"
-                    placeholder='npr. "Teta Ana" ili "Obitelj Kovač"'
-                    value={name}
-                    onChange={e => setName(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-                    className="w-full px-4 py-3 bg-cream border border-blush/40 rounded-xl text-sm focus:outline-none focus:border-blush-mid transition-colors"
-                    autoFocus
-                  />
-                  <p className="text-xs text-warm-gray/60 mt-1.5">
-                    Mama će vidjeti tko je rezervirao ovaj poklon
-                  </p>
-                </div>
-
-                {/* Poruka (opcionalno) */}
-                <div>
-                  <label className="flex items-center gap-1.5 text-xs font-medium text-warm-gray mb-1.5 uppercase tracking-wide">
-                    <MessageSquare size={11} />
-                    Poruka za mamu (opcionalno)
-                  </label>
-                  <textarea
-                    placeholder="Čestitke! Jedva čekamo upoznati malu princezu 🎀"
-                    value={note}
-                    onChange={e => setNote(e.target.value)}
-                    rows={2}
-                    className="w-full px-4 py-3 bg-cream border border-blush/40 rounded-xl text-sm focus:outline-none focus:border-blush-mid resize-none transition-colors"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="px-6 pb-6 flex gap-3">
-              <button
-                onClick={onClose}
-                className="flex-1 py-3 border border-blush/40 text-warm-gray text-sm font-medium rounded-full hover:bg-cream transition-colors"
-              >
-                Odustani
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={!name.trim() || loading}
-                className="flex-1 py-3 bg-rose text-white text-sm font-medium rounded-full hover:bg-rose/90 transition-colors disabled:opacity-50"
-              >
-                {loading ? 'Rezerviram...' : '🎁 Rezerviraj'}
-              </button>
-            </div>
-          </>
-        ) : (
-          /* Uspjeh */
-          <div className="p-8 text-center">
-            <div className="w-16 h-16 bg-sage-light/60 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Check size={28} className="text-sage" />
-            </div>
-            <h3 className="font-serif text-2xl text-charcoal mb-2">Rezervirano!</h3>
-            <p className="text-warm-gray text-sm mb-1">
-              Hvala, <strong>{name}</strong>! 💕
-            </p>
-            <p className="text-warm-gray text-sm mb-6">
-              Mama će znati da ti kupiš <em>{product.name}</em>.
-              Kupi ga direktno na stranici shopa.
-            </p>
-            <a
-              href={product.productUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-sage text-white rounded-full text-sm font-medium hover:bg-sage/90 transition-colors"
+        {available > 1 && (
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-rose-700 mb-1">
+              Količina
+            </label>
+            <select
+              value={quantity}
+              onChange={(e) => setQuantity(Number(e.target.value))}
+              className="w-full border border-rose-200 rounded-xl px-4 py-2.5 text-rose-900 focus:outline-none focus:ring-2 focus:ring-rose-300"
             >
-              <ExternalLink size={14} />
-              Idi na {product.shopName}
-            </a>
-            <button
-              onClick={onClose}
-              className="block mx-auto mt-3 text-xs text-warm-gray hover:text-charcoal transition-colors"
-            >
-              Zatvori
-            </button>
+              {Array.from({ length: available }, (_, i) => i + 1).map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
           </div>
         )}
+
+        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 border border-rose-200 text-rose-500 rounded-xl py-2.5 font-medium hover:bg-rose-50 transition-colors"
+          >
+            Odustani
+          </button>
+          <button
+            onClick={handleReserve}
+            disabled={loading}
+            className="flex-1 bg-rose-400 hover:bg-rose-500 text-white rounded-xl py-2.5 font-medium transition-colors disabled:opacity-60"
+          >
+            {loading ? "Rezerviram..." : "Rezerviraj"}
+          </button>
+        </div>
       </div>
     </div>
-  )
+  );
 }
 
-// Jedna stavka na javnoj listi
-function PublicListItem({ item, onReserve }: {
-  item: ListItem
-  onReserve: (item: ListItem) => void
+function ItemCard({
+  item,
+  onReserve,
+}: {
+  item: ListItem;
+  onReserve: () => void;
 }) {
-  const { product, reservation, priority } = item
-  const isReserved = !!reservation
+  const reserved = getReservedQuantity(item.reservations);
+  const available = item.quantity - reserved;
+  const fullyReserved = available <= 0;
 
-  const formattedPrice = new Intl.NumberFormat('hr-HR', {
-    style: 'currency',
-    currency: product.currency || 'EUR',
-    minimumFractionDigits: 2,
-  }).format(product.price)
-
-  const priorityLabel = {
-    HIGH: '❤️ Jako želi',
-    MEDIUM: '🌿 Bilo bi lijepo',
-    LOW: '✨ Luksuz',
-  }[priority]
+  const priorityLabel: Record<number, string> = {
+    1: "Nisko",
+    2: "Srednje",
+    3: "Visoko",
+  };
+  const priorityColor: Record<number, string> = {
+    1: "bg-sage-100 text-sage-700",
+    2: "bg-amber-100 text-amber-700",
+    3: "bg-rose-100 text-rose-600",
+  };
 
   return (
-    <div className={clsx(
-      'bg-white rounded-2xl border p-4 flex gap-4 transition-all',
-      isReserved ? 'border-gold/30 opacity-75' : 'border-blush/30 hover:border-blush-mid hover:shadow-sm'
-    )}>
-      {/* Slika */}
-      <div className="relative w-20 h-20 flex-shrink-0 bg-cream rounded-xl overflow-hidden">
-        {product.imageUrl ? (
-          <img src={product.imageUrl} alt="" className="w-full h-full object-contain p-1" />
+    <div
+      className={`group relative bg-white rounded-2xl shadow-sm border border-rose-100 overflow-hidden transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${
+        fullyReserved ? "opacity-70" : "cursor-pointer"
+      }`}
+      onClick={() => {
+        if (!fullyReserved) {
+          window.open(item.product.url, "_blank", "noopener,noreferrer");
+        }
+      }}
+    >
+      {/* Image */}
+      <div className="relative h-48 bg-rose-50 overflow-hidden">
+        {item.product.imageUrl ? (
+          <Image
+            src={item.product.imageUrl}
+            alt={item.product.name}
+            fill
+            className="object-contain p-4 group-hover:scale-105 transition-transform duration-300"
+          />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <span className="text-3xl opacity-20">🍼</span>
+          <div className="flex items-center justify-center h-full text-rose-200">
+            <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+            </svg>
           </div>
         )}
-        {isReserved && (
-          <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
-            <div className="w-8 h-8 bg-gold rounded-full flex items-center justify-center">
-              <Check size={14} className="text-white" />
-            </div>
-          </div>
-        )}
-      </div>
 
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-charcoal line-clamp-2 leading-snug">{product.name}</p>
-        <div className="flex items-center gap-2 mt-1 flex-wrap">
-          <span className="text-sm font-medium text-rose">{formattedPrice}</span>
-          <span className="text-xs text-warm-gray/50">·</span>
-          <span className="text-xs text-warm-gray">{product.shopName}</span>
-        </div>
-        <div className="flex items-center gap-2 mt-2 flex-wrap">
-          <span className={clsx(
-            'text-xs px-2 py-0.5 rounded-full font-medium',
-            { HIGH: 'priority-HIGH', MEDIUM: 'priority-MEDIUM', LOW: 'priority-LOW' }[priority]
-          )}>
-            {priorityLabel}
-          </span>
-
-          {isReserved ? (
-            <span className="text-xs px-2 py-0.5 bg-gold/15 text-gold rounded-full font-medium">
-              🎁 Rezervirala: {reservation!.reservedBy}
-            </span>
-          ) : null}
-        </div>
-      </div>
-
-      {/* Akcije */}
-      <div className="flex flex-col gap-2 flex-shrink-0">
-        {isReserved ? (
-          <span className="text-xs text-warm-gray text-right">Rezervirano</span>
-        ) : (
-          <button
-            onClick={() => onReserve(item)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-rose text-white text-xs font-medium rounded-xl hover:bg-rose/90 transition-colors whitespace-nowrap"
+        {/* Priority badge */}
+        {item.priority > 0 && (
+          <span
+            className={`absolute top-3 left-3 text-xs font-medium px-2 py-0.5 rounded-full ${
+              priorityColor[item.priority] ||
+              "bg-gray-100 text-gray-600"
+            }`}
           >
-            <Gift size={12} />
-            Kupit ću ovo
-          </button>
+            {priorityLabel[item.priority] || ""}
+          </span>
         )}
-        <a
-          href={product.productUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1 text-xs text-warm-gray hover:text-sage transition-colors justify-end"
-        >
-          <ExternalLink size={11} />
-          Shop
-        </a>
+
+        {/* Fully reserved overlay */}
+        {fullyReserved && (
+          <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
+            <span className="bg-green-100 text-green-700 font-semibold px-4 py-1.5 rounded-full text-sm">
+              ✓ Rezervirano
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="p-4">
+        <h3 className="font-medium text-rose-900 leading-snug line-clamp-2 mb-1">
+          {item.product.name}
+        </h3>
+
+        {item.product.price && (
+          <p className="text-rose-500 font-semibold text-sm mb-2">
+            {item.product.price.toFixed(2)} €
+          </p>
+        )}
+
+        {item.notes && (
+          <p className="text-xs text-rose-400 italic mb-3 line-clamp-2">
+            {item.notes}
+          </p>
+        )}
+
+        {/* Quantity info */}
+        <div className="flex items-center justify-between text-xs text-rose-400 mb-3">
+          <span>
+            {reserved > 0
+              ? `${reserved} od ${item.quantity} rezervirano`
+              : `${item.quantity} kom`}
+          </span>
+          {item.product.category && (
+            <span className="bg-rose-50 px-2 py-0.5 rounded-full">
+              {item.product.category}
+            </span>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-2">
+          <a
+            href={item.product.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="flex-1 text-center text-xs font-medium border border-rose-200 text-rose-500 rounded-xl py-2 hover:bg-rose-50 transition-colors"
+          >
+            Pogledaj u shopu →
+          </a>
+          {!fullyReserved && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onReserve();
+              }}
+              className="flex-1 text-xs font-medium bg-rose-400 hover:bg-rose-500 text-white rounded-xl py-2 transition-colors"
+            >
+              Rezerviraj
+            </button>
+          )}
+        </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default function PublicListPage() {
-  const { slug } = useParams() as { slug: string }
-  const [list, setList] = useState<BabyList | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [reserveItem, setReserveItem] = useState<ListItem | null>(null)
-  const [filter, setFilter] = useState<'all' | 'available' | 'reserved'>('all')
+export default function SharedListPage() {
+  const params = useParams();
+  const slug = params?.slug as string;
+
+  const [list, setList] = useState<BabyList | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [selectedItem, setSelectedItem] = useState<ListItem | null>(null);
+  const [successItem, setSuccessItem] = useState<string | null>(null);
+
+  async function fetchList() {
+    try {
+      const res = await fetch(`${API_URL}/api/lists/slug/${slug}`);
+      if (!res.ok) throw new Error("Lista nije pronađena.");
+      const data = await res.json();
+      setList(data);
+    } catch {
+      setError("Lista nije pronađena ili je uklonjena.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    publicApi.getList(slug)
-      .then(res => setList(res.data))
-      .catch(err => {
-        setError(err.response?.data?.error || 'Lista nije pronađena')
-      })
-      .finally(() => setLoading(false))
-  }, [slug])
+    if (slug) fetchList();
+  }, [slug]);
 
-  const handleReserve = async (itemId: string, name: string, note?: string) => {
-    await publicApi.reserve(slug, itemId, name, note)
-    // Ažuriraj lokalni state
-    setList(prev => {
-      if (!prev) return prev
-      return {
-        ...prev,
-        items: prev.items.map(i =>
-          i.id === itemId
-            ? { ...i, reservation: { id: 'temp', listItemId: itemId, reservedBy: name, reservedAt: new Date().toISOString(), status: 'RESERVED', note } }
-            : i
-        )
-      }
-    })
+  async function handleReservationSuccess() {
+    if (selectedItem) setSuccessItem(selectedItem.id);
+    setSelectedItem(null);
+    await fetchList();
+    setTimeout(() => setSuccessItem(null), 3000);
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-cream flex items-center justify-center">
-        <div className="text-center">
-          <span className="text-5xl animate-bounce block mb-4">🍼</span>
-          <p className="text-warm-gray">Učitavanje liste...</p>
-        </div>
+      <div className="min-h-screen bg-rose-50 flex items-center justify-center">
+        <div className="text-rose-400 text-lg animate-pulse">Učitavam listu...</div>
       </div>
-    )
+    );
   }
 
   if (error || !list) {
     return (
-      <div className="min-h-screen bg-cream flex items-center justify-center p-4">
+      <div className="min-h-screen bg-rose-50 flex items-center justify-center">
         <div className="text-center">
-          <span className="text-5xl block mb-4">😔</span>
-          <h1 className="font-serif text-2xl text-charcoal mb-2">Lista nije pronađena</h1>
-          <p className="text-warm-gray text-sm">{error}</p>
+          <div className="text-5xl mb-4">🍼</div>
+          <h1 className="text-xl font-semibold text-rose-800 mb-2">Ups!</h1>
+          <p className="text-rose-500">{error || "Lista nije pronađena."}</p>
         </div>
       </div>
-    )
+    );
   }
 
-  const mama = list.user!
-  const daysUntilDue = mama.dueDate
-    ? differenceInDays(new Date(mama.dueDate), new Date())
-    : null
-
-  const filteredItems = list.items.filter(i => {
-    if (filter === 'available') return !i.reservation
-    if (filter === 'reserved') return !!i.reservation
-    return true
-  })
-
-  const totalItems = list.items.length
-  const reservedItems = list.items.filter(i => i.reservation).length
-  const availableItems = totalItems - reservedItems
+  const totalItems = list.items.length;
+  const reservedItems = list.items.filter(
+    (i) => getReservedQuantity(i.reservations) >= i.quantity
+  ).length;
 
   return (
-    <div className="min-h-screen bg-cream">
-      {/* Hero header */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 -z-10">
-          <div className="absolute top-0 right-0 w-96 h-64 bg-blush/50 rounded-full blur-3xl translate-x-1/3" />
-          <div className="absolute bottom-0 left-0 w-80 h-48 bg-sage-light/40 rounded-full blur-3xl -translate-x-1/4" />
-        </div>
-
-        <div className="max-w-2xl mx-auto px-4 pt-12 pb-8 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/80 backdrop-blur-sm rounded-full text-warm-gray text-xs mb-5 border border-blush/30">
-            <Heart size={11} className="text-rose" />
-            Baby lista
-          </div>
-
-          <h1 className="font-serif text-4xl sm:text-5xl text-charcoal mb-3">
-            {list.name}
-          </h1>
-
-          <p className="text-warm-gray mb-2">
-            Lista za bebu <strong>{mama.name}</strong>
-          </p>
-
-          {/* Info o bebi */}
-          <div className="flex items-center justify-center gap-4 flex-wrap mt-4">
-            {mama.dueDate && (
-              <span className="flex items-center gap-1.5 text-sm text-warm-gray bg-white/70 px-3 py-1.5 rounded-full border border-blush/30">
-                🗓️ Termin: {format(new Date(mama.dueDate), 'd. MMMM yyyy.', { locale: hr })}
-                {daysUntilDue !== null && daysUntilDue > 0 && (
-                  <span className="text-rose font-medium">({daysUntilDue} dana)</span>
-                )}
-              </span>
-            )}
-            {mama.babyGender && mama.babyGender !== 'surprise' && (
-              <span className="flex items-center gap-1.5 text-sm text-warm-gray bg-white/70 px-3 py-1.5 rounded-full border border-blush/30">
-                {mama.babyGender === 'boy' ? '💙 Dječak' : '💗 Djevojčica'}
-              </span>
-            )}
-            {mama.babyGender === 'surprise' && (
-              <span className="flex items-center gap-1.5 text-sm text-warm-gray bg-white/70 px-3 py-1.5 rounded-full border border-blush/30">
-                🎀 Iznenađenje
-              </span>
-            )}
-          </div>
-
-          {list.description && (
-            <p className="mt-4 text-warm-gray text-sm italic max-w-md mx-auto">{list.description}</p>
-          )}
-
-          {/* Statistike */}
-          <div className="flex justify-center gap-6 mt-6">
-            <div className="text-center">
-              <p className="text-2xl font-serif text-charcoal">{totalItems}</p>
-              <p className="text-xs text-warm-gray">ukupno</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-serif text-rose">{availableItems}</p>
-              <p className="text-xs text-warm-gray">slobodno</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-serif text-gold">{reservedItems}</p>
-              <p className="text-xs text-warm-gray">rezervirano</p>
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-rose-50 via-amber-50 to-rose-100">
+      {/* Header */}
+      <div className="bg-white/80 backdrop-blur-sm border-b border-rose-100 sticky top-0 z-10">
+        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="text-rose-400 font-semibold text-lg">🍼 Bebina Lista</div>
+          <div className="text-xs text-rose-400">
+            {reservedItems} / {totalItems} rezervirano
           </div>
         </div>
       </div>
 
-      {/* Lista */}
-      <div className="max-w-2xl mx-auto px-4 pb-16">
-        {/* Filteri */}
-        <div className="flex gap-2 mb-5">
-          {[
-            { key: 'all', label: 'Sve' },
-            { key: 'available', label: '✓ Slobodno' },
-            { key: 'reserved', label: '🎁 Rezervirano' },
-          ].map(f => (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key as typeof filter)}
-              className={clsx(
-                'px-4 py-2 rounded-full text-sm font-medium transition-all',
-                filter === f.key
-                  ? 'bg-charcoal text-white'
-                  : 'bg-white text-warm-gray border border-blush/40 hover:border-blush-mid'
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
+      <div className="max-w-5xl mx-auto px-4 py-10">
+        {/* Hero */}
+        <div className="text-center mb-10">
+          <div className="text-5xl mb-4">🎀</div>
+          <h1 className="text-3xl font-bold text-rose-800 mb-2">{list.name}</h1>
+          {list.babyName && (
+            <p className="text-rose-500 text-lg mb-1">
+              za bebu <span className="font-semibold">{list.babyName}</span>
+            </p>
+          )}
+          {list.dueDate && (
+            <p className="text-rose-400 text-sm">
+              Očekivani datum:{" "}
+              {new Date(list.dueDate).toLocaleDateString("hr-HR", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}
+            </p>
+          )}
+          {list.description && (
+            <p className="text-rose-500 mt-4 max-w-xl mx-auto leading-relaxed">
+              {list.description}
+            </p>
+          )}
+          <p className="text-rose-300 text-sm mt-2">
+            Lista kreirana od: {list.user.name}
+          </p>
         </div>
 
-        {/* Stavke */}
-        <div className="space-y-3">
-          {filteredItems.length === 0 ? (
-            <div className="text-center py-12">
-              <span className="text-4xl block mb-3">
-                {filter === 'reserved' ? '🎁' : '🔍'}
-              </span>
-              <p className="text-warm-gray text-sm">
-                {filter === 'reserved' ? 'Još ništa nije rezervirano' : 'Nema slobodnih stavki'}
-              </p>
-            </div>
-          ) : (
-            filteredItems.map(item => (
-              <PublicListItem
+        {/* Success toast */}
+        {successItem && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-2xl shadow-lg z-50 text-sm font-medium">
+            ✓ Rezervacija uspješna! Hvala ti! 🎉
+          </div>
+        )}
+
+        {/* Items grid */}
+        {list.items.length === 0 ? (
+          <div className="text-center py-20 text-rose-300">
+            <div className="text-4xl mb-4">🛒</div>
+            <p>Lista je trenutno prazna.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {list.items.map((item) => (
+              <ItemCard
                 key={item.id}
                 item={item}
-                onReserve={() => setReserveItem(item)}
+                onReserve={() => setSelectedItem(item)}
               />
-            ))
-          )}
-        </div>
-
-        {/* Footer info */}
-        <div className="mt-10 p-5 bg-white/60 rounded-2xl border border-blush/20 text-center">
-          <p className="text-sm text-warm-gray">
-            🎀 Ova lista je kreirana na{' '}
-            <a href="/" className="text-rose hover:underline font-medium">Bebinoj Listi</a>
-            . Kupuj direktno u shopu klikom na gumb "Shop" — ništa se ne plaća ovdje.
-          </p>
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Reserve modal */}
-      {reserveItem && (
-        <ReserveModal
-          item={reserveItem}
-          onClose={() => setReserveItem(null)}
-          onReserve={handleReserve}
+      {/* Reservation modal */}
+      {selectedItem && (
+        <ReservationModal
+          item={selectedItem}
+          onClose={() => setSelectedItem(null)}
+          onSuccess={handleReservationSuccess}
         />
       )}
     </div>
-  )
+  );
 }
