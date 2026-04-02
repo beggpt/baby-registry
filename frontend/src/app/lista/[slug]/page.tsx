@@ -182,9 +182,11 @@ function PublicListItem({ item, onReserve }: {
 
   return (
     <div className={clsx(
-      'bg-white rounded-2xl border p-4 flex gap-4 transition-all',
+      'bg-white rounded-2xl border p-4 flex gap-4 transition-all cursor-pointer',
       isReserved ? 'border-gold/30 opacity-75' : 'border-blush/30 hover:border-blush-mid hover:shadow-sm'
-    )}>
+    )}
+      onClick={() => window.open(product.productUrl, '_blank', 'noopener,noreferrer')}
+    >
       {/* Slika */}
       <div className="relative w-20 h-20 flex-shrink-0 bg-cream rounded-xl overflow-hidden">
         {product.imageUrl ? (
@@ -221,7 +223,7 @@ function PublicListItem({ item, onReserve }: {
 
           {isReserved ? (
             <span className="text-xs px-2 py-0.5 bg-gold/15 text-gold rounded-full font-medium">
-              🎁 Rezervirala: {reservation!.reservedBy}
+              🎁 Rezervirano od: {reservation!.reservedBy}
             </span>
           ) : null}
         </div>
@@ -233,7 +235,7 @@ function PublicListItem({ item, onReserve }: {
           <span className="text-xs text-warm-gray text-right">Rezervirano</span>
         ) : (
           <button
-            onClick={() => onReserve(item)}
+            onClick={(e) => { e.stopPropagation(); onReserve(item) }}
             className="flex items-center gap-1.5 px-3 py-2 bg-rose text-white text-xs font-medium rounded-xl hover:bg-rose/90 transition-colors whitespace-nowrap"
           >
             <Gift size={12} />
@@ -244,6 +246,7 @@ function PublicListItem({ item, onReserve }: {
           href={product.productUrl}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
           className="flex items-center gap-1 text-xs text-warm-gray hover:text-sage transition-colors justify-end"
         >
           <ExternalLink size={11} />
