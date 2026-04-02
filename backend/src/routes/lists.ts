@@ -15,7 +15,7 @@ const listItemInclude = {
 listsRouter.get('/public/:id', async (req, res) => {
   try {
     const list = await prisma.babyList.findFirst({
-      where: { id: req.params.id, isPublic: true },
+      where: { shareSlug: req.params.id, isPublic: true },
       include: {
         user: { select: { name: true } },
         items: {
