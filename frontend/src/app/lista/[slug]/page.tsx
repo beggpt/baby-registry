@@ -302,7 +302,7 @@ export default function SharedListPage() {
 
   async function fetchList() {
     try {
-      const res = await fetch(`${API_URL}/api/lists/slug/${slug}`);
+      const res = await fetch(`${API_URL}/lists/slug/${slug}`);
       if (!res.ok) throw new Error("Lista nije pronađena.");
       const data = await res.json();
       setList(data);
