@@ -20,7 +20,7 @@ interface ListItem {
   quantity: number;
   priority: number;
   notes: string | null;
-  reservations: Reservation[];
+  reservation: Reservation[];
   product: Product;
 }
 
@@ -43,8 +43,8 @@ interface BabyList {
   };
 }
 
-function getReservedQuantity(reservations: Reservation[]): number {
-  return reservations.reduce((sum, r) => sum + r.quantity, 0);
+function getReservedQuantity(reservation: Reservation[]): number {
+  return reservation.reduce((sum, r) => sum + r.quantity, 0);
 }
 
 function ReservationModal({
@@ -61,7 +61,7 @@ function ReservationModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const reserved = getReservedQuantity(item.reservations);
+  const reserved = getReservedQuantity(item.reservation);
   const available = item.quantity - reserved;
 
   async function handleReserve() {
@@ -165,7 +165,7 @@ function ItemCard({
   item: ListItem;
   onReserve: () => void;
 }) {
-  const reserved = getReservedQuantity(item.reservations);
+  const reserved = getReservedQuantity(item.reservation);
   const available = item.quantity - reserved;
   const fullyReserved = available <= 0;
 
@@ -302,7 +302,7 @@ export default function SharedListPage() {
 
   async function fetchList() {
     try {
-      const res = await fetch(`${API_URL}/lists/public/${slug}`);
+      const res = await fetch(`${API_URL}/lists/slug/${slug}`);
       if (!res.ok) throw new Error("Lista nije pronađena.");
       const data = await res.json();
       setList(data);
@@ -346,7 +346,7 @@ export default function SharedListPage() {
 
   const totalItems = list.items.length;
   const reservedItems = list.items.filter(
-    (i) => getReservedQuantity(i.reservations) >= i.quantity
+    (i) => getReservedQuantity(i.reservation) >= i.quantity
   ).length;
 
   return (
