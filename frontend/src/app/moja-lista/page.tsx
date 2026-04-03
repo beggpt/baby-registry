@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import { listsApi, authApi } from '@/lib/api'
@@ -7,7 +7,8 @@ import { useAuthStore } from '@/lib/store'
 import { BabyList, ListItem, Priority } from '@/types'
 import {
   Plus, Link2, Trash2, Heart, ExternalLink, Check,
-  X, ChevronDown, ChevronUp, ShoppingBag, Calendar, Edit3, Save
+  X, ChevronDown, ChevronUp, ShoppingBag, Calendar, Edit3, Save,
+  Share2, MessageSquare, QrCode, Download
 } from 'lucide-react'
 import clsx from 'clsx'
 import { addRefToUrl } from '@/lib/api'
@@ -30,7 +31,7 @@ function parseDMY(s: string): Date | null {
   return isNaN(d.getTime()) ? null : d
 }
 
-// Klikabilna stavka liste - cijeli red vodi na shop
+// Stavka liste - div umjesto <a> da select/button rade ispravno
 function ListItemRow({ item, listId, onDelete, onPriorityChange }: {
   item: ListItem; listId: string
   onDelete: (id: string) => void
@@ -42,18 +43,19 @@ function ListItemRow({ item, listId, onDelete, onPriorityChange }: {
   const shopUrl = addRefToUrl(product.productUrl)
 
   const handleDelete = async (e: React.MouseEvent) => {
-    e.preventDefault()
     e.stopPropagation()
     setDeleting(true)
     try { await listsApi.removeItem(listId, item.id); onDelete(item.id) }
     catch { setDeleting(false) }
   }
 
+  const handleRowClick = () => {
+    window.open(shopUrl, '_blank', 'noopener,noreferrer')
+  }
+
   return (
-    <a
-      href={shopUrl}
-      target="_blank"
-      rel="noopener noreferrer"
+    <div
+      onClick={handleRowClick}
       className={clsx(
         'flex gap-3 p-3 bg-white rounded-2xl border transition-all group cursor-pointer',
         'hover:border-blush-mid hover:shadow-sm',
@@ -80,8 +82,9 @@ function ListItemRow({ item, listId, onDelete, onPriorityChange }: {
           <span className="text-sm font-medium text-rose">{price}</span>
           <select
             value={item.priority}
-            onChange={e => { e.preventDefault(); e.stopPropagation(); onPriorityChange(item.id, e.target.value as Priority) }}
+            onChange={e => { e.stopPropagation(); onPriorityChange(item.id, e.target.value as Priority) }}
             onClick={e => e.stopPropagation()}
+            onMouseDown={e => e.stopPropagation()}
             className={clsx('text-xs px-2 py-0.5 rounded-full border-0 cursor-pointer focus:outline-none font-medium', PRIORITY_CONFIG[item.priority].cls)}
           >
             {Object.entries(PRIORITY_CONFIG).map(([val, conf]) => (
@@ -93,6 +96,14 @@ function ListItemRow({ item, listId, onDelete, onPriorityChange }: {
             : <span className="text-xs px-2 py-0.5 status-available rounded-full">✓ Slobodno</span>
           }
         </div>
+
+        {/* Poruka od osobe koja je rezervirala */}
+        {reservation?.note && (
+          <div className="mt-2 flex items-start gap-1.5 p-2 bg-sage-light/20 rounded-lg border border-sage/10">
+            <MessageSquare size={11} className="text-sage flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-charcoal/70 italic leading-relaxed">&quot;{reservation.note}&quot;</p>
+          </div>
+        )}
       </div>
 
       {/* Brisanje */}
@@ -103,7 +114,7 @@ function ListItemRow({ item, listId, onDelete, onPriorityChange }: {
       >
         <Trash2 size={13} />
       </button>
-    </a>
+    </div>
   )
 }
 
@@ -157,6 +168,123 @@ function EditableListName({ name, onSave }: { name: string; onSave: (newName: st
       <span className="truncate">{name}</span>
       <Edit3 size={12} className="text-warm-gray/40 group-hover:text-rose transition-colors flex-shrink-0" />
     </button>
+  )
+}
+
+// Share modal s WhatsApp, Viber, link, QR kod
+function ShareModal({ slug, listName, onClose }: { slug: string; listName: string; onClose: () => void }) {
+  const [copied, setCopied] = useState(false)
+  const [qrDataUrl, setQrDataUrl] = useState<string>('')
+  const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/lista/${slug}` : ''
+  const shareText = `Pogledaj moju baby listu "${listName}" 🎀`
+
+  useEffect(() => {
+    if (!shareUrl) return
+    import('qrcode').then(QRCode => {
+      QRCode.toDataURL(shareUrl, {
+        width: 280,
+        margin: 2,
+        color: { dark: '#2C2320', light: '#FAF7F2' },
+      }).then(url => setQrDataUrl(url))
+        .catch(() => {})
+    }).catch(() => {})
+  }, [shareUrl])
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(shareUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const downloadQR = () => {
+    if (!qrDataUrl) return
+    const a = document.createElement('a')
+    a.href = qrDataUrl
+    a.download = `bebina-lista-${slug.substring(0, 8)}-qr.png`
+    a.click()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-charcoal/40 backdrop-blur-sm fade-in">
+      <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden fade-up">
+        <div className="p-6">
+          <div className="flex justify-between items-start mb-5">
+            <h3 className="font-serif text-xl text-charcoal">Podijeli listu</h3>
+            <button onClick={onClose} className="p-1.5 hover:bg-cream rounded-full transition-colors">
+              <X size={18} className="text-warm-gray" />
+            </button>
+          </div>
+
+          {/* Link */}
+          <div className="flex gap-2 mb-5">
+            <input
+              type="text"
+              value={shareUrl}
+              readOnly
+              className="flex-1 px-3 py-2.5 bg-cream border border-blush/40 rounded-xl text-xs text-charcoal font-mono truncate"
+            />
+            <button
+              onClick={copyLink}
+              className="px-4 py-2.5 bg-charcoal text-white text-xs font-medium rounded-xl hover:bg-charcoal/90 transition-colors whitespace-nowrap"
+            >
+              {copied ? '✓ Kopirano!' : 'Kopiraj'}
+            </button>
+          </div>
+
+          {/* Share buttons */}
+          <div className="grid grid-cols-2 gap-2 mb-5">
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(shareText + '\n' + shareUrl)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/20 rounded-xl text-sm font-medium hover:bg-[#25D366]/20 transition-colors"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+              WhatsApp
+            </a>
+            <a
+              href={`viber://forward?text=${encodeURIComponent(shareText + '\n' + shareUrl)}`}
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-[#7360F2]/10 text-[#7360F2] border border-[#7360F2]/20 rounded-xl text-sm font-medium hover:bg-[#7360F2]/20 transition-colors"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M11.398.002C9.473.028 5.331.344 3.014 2.467.312 4.95-.058 8.58.004 12.159c.063 3.578.695 10.075 6.838 11.77l.007.001h.006l-.003 2.7s-.037.542.335.654c.449.136.712-.29.712-.29s.818-.932 1.69-2.052c2.924.254 5.173-.315 5.424-.394.578-.182 3.847-.607 4.382-4.952.553-4.485-.267-7.333-1.748-8.615-.03-.027-.06-.052-.088-.079 0 0 .001 0 0 0-.522-1.227-1.6-2.388-3.1-3.322C12.832.533 11.9.049 11.398.002zm.136 1.474c.377.03 1.192.405 2.577 1.194 1.326.826 2.263 1.833 2.681 2.863l.003.007c.013.035.025.07.035.107.022.074.03.16.005.258.972.875 2.043 2.825 1.634 6.158l-.003.021c-.458 3.692-3.173 4.058-3.672 4.215-.21.066-2.226.568-4.834.388l-.006.007c-.62.718-1.622 1.87-1.622 1.87-.31.366-.63.328-.624-.156l.021-2.142c-5.18-1.422-4.852-6.886-4.802-9.703.05-2.816.71-5.787 2.97-7.948 1.915-1.778 5.258-2.148 6.636-2.138h1.001zM11.376 4.4a.31.31 0 00-.209.09.307.307 0 00.006.434c.034.032.073.058.115.074a.318.318 0 00.242-.015.308.308 0 00.138-.394.31.31 0 00-.292-.189zm.994.098c-.05.002-.098.014-.143.04-.21.12-.345.48-.335.62.015.21.21.41.412.35.195-.055.327-.2.33-.42.002-.215-.039-.6-.264-.59zm-2.132.25a.31.31 0 00-.236.08.307.307 0 00-.024.434.32.32 0 00.356.07.311.311 0 00.197-.233.307.307 0 00-.097-.288.312.312 0 00-.196-.064zm3.146.156c-.048 0-.097.01-.143.032-.32.157-.472.597-.33.76.162.186.475.195.653-.01.175-.2.14-.636-.037-.752a.315.315 0 00-.143-.03zM8.937 5.42a.31.31 0 00-.253.068.307.307 0 00-.05.433.317.317 0 00.383.082.308.308 0 00.17-.254.307.307 0 00-.119-.273.31.31 0 00-.13-.056zm6.015.398l-.122.013c-.413.093-.656.665-.435.877.193.185.567.144.758-.105.19-.25.21-.705-.059-.77a.307.307 0 00-.142-.015zm-7.086.433a.31.31 0 00-.264.06.307.307 0 00.023.497.319.319 0 00.306.011.31.31 0 00.173-.24.307.307 0 00-.238-.328zm.93 3.655c-.074 0-.15.023-.221.072-.27.187-.31.474-.053.618.258.145.6.023.667-.234.067-.257-.117-.456-.393-.456zm1.088 4.222c-.094 0-.186.034-.258.1a.44.44 0 00.033.66c.199.149.487.13.662-.044.18-.178.14-.5-.063-.64a.46.46 0 00-.293-.08l-.081.004z"/></svg>
+              Viber
+            </a>
+          </div>
+
+          {/* Messenger */}
+          <a
+            href={`fb-messenger://share/?link=${encodeURIComponent(shareUrl)}`}
+            className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-[#0084FF]/10 text-[#0084FF] border border-[#0084FF]/20 rounded-xl text-sm font-medium hover:bg-[#0084FF]/20 transition-colors mb-5"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 4.975 0 11.111c0 3.497 1.745 6.616 4.472 8.652V24l4.086-2.242c1.09.301 2.246.464 3.442.464 6.627 0 12-4.974 12-11.111C24 4.975 18.627 0 12 0zm1.193 14.963l-3.056-3.259-5.963 3.259 6.559-6.963 3.13 3.259 5.889-3.259-6.559 6.963z"/></svg>
+            Messenger
+          </a>
+
+          {/* QR kod */}
+          {qrDataUrl && (
+            <div className="text-center border-t border-blush/20 pt-5">
+              <p className="text-xs font-medium text-warm-gray uppercase tracking-wide mb-3 flex items-center justify-center gap-1.5">
+                <QrCode size={12} />
+                QR kod za pozivnicu
+              </p>
+              <div className="inline-block bg-cream p-3 rounded-2xl border border-blush/30">
+                <img src={qrDataUrl} alt="QR kod za listu" className="w-48 h-48" />
+              </div>
+              <p className="text-xs text-warm-gray/60 mt-2 mb-3">
+                Skeniraj ili stavi na baby shower pozivnicu
+              </p>
+              <button
+                onClick={downloadQR}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-cream border border-blush/40 rounded-full text-xs font-medium text-charcoal hover:bg-blush/30 transition-colors"
+              >
+                <Download size={12} />
+                Preuzmi QR kod
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -276,7 +404,7 @@ export default function MojaListaPage() {
   const [loading, setLoading] = useState(true)
   const [expandedList, setExpandedList] = useState<string | null>(null)
   const [showNewModal, setShowNewModal] = useState(false)
-  const [copiedSlug, setCopiedSlug] = useState<string | null>(null)
+  const [shareModal, setShareModal] = useState<{ slug: string; name: string } | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
   useEffect(() => { loadFromStorage() }, [])
@@ -332,13 +460,6 @@ export default function MojaListaPage() {
       ? { ...l, items: l.items.map(i => i.id === itemId ? { ...i, priority } : i) }
       : l
     ))
-  }
-
-  const copyShareLink = (slug: string) => {
-    navigator.clipboard.writeText(`${window.location.origin}/lista/${slug}`)
-    setCopiedSlug(slug)
-    setTimeout(() => setCopiedSlug(null), 2000)
-    showToast('Link kopiran! 🔗')
   }
 
   const getOcc = (occ?: string | null) => OCCASIONS.find(o => o.value === occ)
@@ -409,10 +530,10 @@ export default function MojaListaPage() {
 
                     {/* Akcije */}
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <button onClick={() => copyShareLink(list.shareSlug)}
+                      <button onClick={() => setShareModal({ slug: list.shareSlug, name: list.name })}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-sage bg-sage-light/50 rounded-full hover:bg-sage-light transition-colors">
-                        {copiedSlug === list.shareSlug ? <Check size={12} /> : <Link2 size={12} />}
-                        {copiedSlug === list.shareSlug ? 'Kopirano!' : 'Dijeli'}
+                        <Share2 size={12} />
+                        Dijeli
                       </button>
                       <button onClick={() => handleDeleteList(list.id)} className="p-1.5 text-warm-gray hover:text-rose transition-colors">
                         <Trash2 size={16} />
@@ -461,6 +582,7 @@ export default function MojaListaPage() {
       </main>
 
       {showNewModal && <NewListModal onClose={() => setShowNewModal(false)} onCreate={handleCreate} />}
+      {shareModal && <ShareModal slug={shareModal.slug} listName={shareModal.name} onClose={() => setShareModal(null)} />}
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 bg-charcoal text-white text-sm rounded-full shadow-2xl fade-in">
