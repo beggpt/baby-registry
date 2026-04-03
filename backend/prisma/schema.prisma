@@ -64,23 +64,54 @@ model ListItem {
 }
 
 model Reservation {
-  id          String            @id @default(cuid())
-  listItemId  String            @unique
-  listItem    ListItem          @relation(fields: [listItemId], references: [id], onDelete: Cascade)
-  reservedBy  String
-  reservedAt  DateTime          @default(now())
-  status      ReservationStatus @default(RESERVED)
-  note        String?
+  id            String            @id @default(cuid())
+  listItemId    String            @unique
+  listItem      ListItem          @relation(fields: [listItemId], references: [id], onDelete: Cascade)
+  reservedBy    String
+  reservedAt    DateTime          @default(now())
+  status        ReservationStatus @default(RESERVED)
+  note          String?
+  isGroupBuy    Boolean           @default(false)
+  targetAmount  Float?
+  contributors  GroupContributor[]
+}
+
+enum ContributorRole {
+  ORDERER
+  CONTRIBUTOR
+}
+
+model GroupContributor {
+  id            String          @id @default(cuid())
+  reservationId String
+  reservation   Reservation     @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  name          String
+  role          ContributorRole @default(CONTRIBUTOR)
+  amount        Float
+  note          String?
+  createdAt     DateTime        @default(now())
 }
 
 model Category {
-  id        String     @id @default(cuid())
-  name      String
-  slug      String     @unique
-  parentId  String?
-  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
-  children  Category[] @relation("CategoryTree")
-  products  Product[]
+  id               String            @id @default(cuid())
+  name             String
+  slug             String            @unique
+  parentId         String?
+  parent           Category?         @relation("CategoryTree", fields: [parentId], references: [id])
+  children         Category[]        @relation("CategoryTree")
+  products         Product[]
+  categoryMappings CategoryMapping[]
+}
+
+model CategoryMapping {
+  id           String   @id @default(cuid())
+  externalName String
+  shopSlug     String?
+  categoryId   String
+  category     Category @relation(fields: [categoryId], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@unique([externalName, shopSlug])
 }
 
 model Product {

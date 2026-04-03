@@ -4,11 +4,11 @@ import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import { adminApi, productsApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
-import { Product, AdminUser } from '@/types'
-import { RefreshCw, Search, Shield, X } from 'lucide-react'
+import { Product, AdminUser, CategoryMapping, Category } from '@/types'
+import { RefreshCw, Search, Shield, X, Power, ArrowRight, Trash2 } from 'lucide-react'
 import clsx from 'clsx'
 
-type Tab = 'overview' | 'users' | 'scraper' | 'featured' | 'settings'
+type Tab = 'overview' | 'users' | 'scraper' | 'featured' | 'categories' | 'settings'
 
 export default function AdminPage() {
   const router = useRouter()
@@ -31,6 +31,14 @@ export default function AdminPage() {
   const [heroSaving, setHeroSaving] = useState(false)
   const [selectedUserList, setSelectedUserList] = useState<any>(null)
 
+  // Category mapping state
+  const [mappings, setMappings] = useState<CategoryMapping[]>([])
+  const [unmapped, setUnmapped] = useState<Array<{ externalName: string; shopSlug: string; count: number }>>([])
+  const [allCategories, setAllCategories] = useState<Category[]>([])
+  const [newMappingExternal, setNewMappingExternal] = useState('')
+  const [newMappingShop, setNewMappingShop] = useState('')
+  const [newMappingCategory, setNewMappingCategory] = useState('')
+
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000) }
 
   useEffect(() => { loadFromStorage() }, [])
@@ -44,7 +52,6 @@ export default function AdminPage() {
     adminApi.getShops().then(r => setShops(r.data)).catch(() => {})
     adminApi.getFeatured().then(r => setFeatured(r.data)).catch(() => {})
     adminApi.getSettings().then(r => { setSettings(r.data); setHeroUrl(r.data.heroImage || '') }).catch(() => {})
-    // Load recent users lists for overview
     adminApi.getUsers({ page: 1 }).then(r => {
       setRecentLists(r.data.users || [])
     }).catch(() => {})
@@ -62,14 +69,32 @@ export default function AdminPage() {
       .then(r => setProducts(r.data.products)).catch(() => {})
   }, [tab, productSearch])
 
+  useEffect(() => {
+    if (tab !== 'categories') return
+    adminApi.getCategoryMappings().then(r => setMappings(r.data)).catch(() => {})
+    adminApi.getUnmappedCategories().then(r => setUnmapped(r.data)).catch(() => {})
+    adminApi.getCategories().then(r => setAllCategories(r.data)).catch(() => {})
+  }, [tab])
+
   const handleScrape = async (slug: string) => {
     setScraping(p => ({ ...p, [slug]: true }))
     try {
       await adminApi.triggerScrape(slug)
       showToast(`Scraping pokrenut za ${slug}!`)
       setTimeout(() => adminApi.getShops().then(r => setShops(r.data)), 3000)
-    } catch { showToast('Greška') }
+    } catch { showToast('Greska') }
     finally { setTimeout(() => setScraping(p => ({ ...p, [slug]: false })), 3000) }
+  }
+
+  const handleToggleShop = async (slug: string) => {
+    try {
+      const res = await adminApi.toggleShop(slug)
+      setShops(prev => prev.map(s => s.slug === slug ? res.data : s))
+      const shop = res.data
+      showToast(shop.isActive
+        ? `${shop.name} ukljucen -- proizvodi ce biti prikazani`
+        : `${shop.name} iskljucen -- proizvodi nece biti prikazani na stranici`)
+    } catch { showToast('Greska pri prebacivanju') }
   }
 
   const handleToggleFeatured = async (product: Product) => {
@@ -81,7 +106,7 @@ export default function AdminPage() {
     } else {
       const res = await adminApi.addFeatured(product.id)
       setFeatured(f => [...f, res.data])
-      showToast('Dodano! ⭐')
+      showToast('Dodano!')
     }
   }
 
@@ -96,15 +121,58 @@ export default function AdminPage() {
     try {
       const res = await adminApi.getUser(userId)
       setSelectedUserList(res.data)
-    } catch { showToast('Greška pri učitavanju') }
+    } catch { showToast('Greska pri ucitavanju') }
+  }
+
+  const handleCreateMapping = async () => {
+    if (!newMappingExternal || !newMappingCategory) return
+    try {
+      const res = await adminApi.createCategoryMapping({
+        externalName: newMappingExternal,
+        shopSlug: newMappingShop || undefined,
+        categoryId: newMappingCategory,
+      })
+      setMappings(prev => [...prev, res.data])
+      setUnmapped(prev => prev.filter(u => u.externalName !== newMappingExternal || u.shopSlug !== newMappingShop))
+      setNewMappingExternal('')
+      setNewMappingShop('')
+      setNewMappingCategory('')
+      showToast('Mapiranje dodano!')
+    } catch (err: any) {
+      showToast(err.response?.data?.error || 'Greska')
+    }
+  }
+
+  const handleDeleteMapping = async (id: string) => {
+    try {
+      await adminApi.deleteCategoryMapping(id)
+      setMappings(prev => prev.filter(m => m.id !== id))
+      showToast('Mapiranje uklonjeno')
+    } catch { showToast('Greska') }
+  }
+
+  const handleQuickMap = async (externalName: string, shopSlug: string, categoryId: string) => {
+    try {
+      const res = await adminApi.createCategoryMapping({
+        externalName,
+        shopSlug: shopSlug || undefined,
+        categoryId,
+      })
+      setMappings(prev => [...prev, res.data])
+      setUnmapped(prev => prev.filter(u => u.externalName !== externalName || u.shopSlug !== shopSlug))
+      showToast('Mapirano!')
+    } catch (err: any) {
+      showToast(err.response?.data?.error || 'Greska')
+    }
   }
 
   const TABS = [
-    { key: 'overview', label: 'Pregled', icon: '📊' },
-    { key: 'users', label: 'Korisnici', icon: '👥' },
-    { key: 'scraper', label: 'Scraper', icon: '🕷️' },
-    { key: 'featured', label: 'Istaknuti', icon: '⭐' },
-    { key: 'settings', label: 'Postavke', icon: '⚙️' },
+    { key: 'overview', label: 'Pregled', icon: '&#x1F4CA;' },
+    { key: 'users', label: 'Korisnici', icon: '&#x1F465;' },
+    { key: 'scraper', label: 'Scraper', icon: '&#x1F577;&#xFE0F;' },
+    { key: 'featured', label: 'Istaknuti', icon: '&#x2B50;' },
+    { key: 'categories', label: 'Kategorije', icon: '&#x1F4C1;' },
+    { key: 'settings', label: 'Postavke', icon: '&#x2699;&#xFE0F;' },
   ]
 
   if (isLoading) return null
@@ -129,7 +197,7 @@ export default function AdminPage() {
               <button key={t.key} onClick={() => setTab(t.key as Tab)}
                 className={clsx('flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap flex-shrink-0',
                   tab === t.key ? 'bg-rose text-white' : 'text-warm-gray hover:text-charcoal')}>
-                {t.icon} {t.label}
+                <span dangerouslySetInnerHTML={{ __html: t.icon }}></span> {t.label}
               </button>
             ))}
           </div>
@@ -140,13 +208,13 @@ export default function AdminPage() {
               {stats && (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   {[
-                    { icon: '👥', label: 'Korisnici', value: stats.usersCount },
-                    { icon: '📋', label: 'Liste', value: stats.listsCount },
-                    { icon: '📦', label: 'Proizvodi', value: stats.productsCount },
-                    { icon: '🎁', label: 'Rezervacije', value: stats.reservationsCount },
+                    { icon: '&#x1F465;', label: 'Korisnici', value: stats.usersCount },
+                    { icon: '&#x1F4CB;', label: 'Liste', value: stats.listsCount },
+                    { icon: '&#x1F4E6;', label: 'Proizvodi', value: stats.productsCount },
+                    { icon: '&#x1F381;', label: 'Rezervacije', value: stats.reservationsCount },
                   ].map((card, i) => (
                     <div key={i} className="bg-white rounded-2xl p-5 border border-blush/30">
-                      <div className="text-3xl mb-2">{card.icon}</div>
+                      <div className="text-3xl mb-2" dangerouslySetInnerHTML={{ __html: card.icon }}></div>
                       <p className="text-2xl font-serif text-charcoal">{card.value?.toLocaleString('hr-HR')}</p>
                       <p className="text-xs text-warm-gray mt-0.5">{card.label}</p>
                     </div>
@@ -154,7 +222,6 @@ export default function AdminPage() {
                 </div>
               )}
 
-              {/* Korisnici i njihove liste */}
               <div className="bg-white rounded-2xl border border-blush/30 p-5">
                 <h2 className="font-serif text-xl text-charcoal mb-4">Zadnji korisnici i njihove liste</h2>
                 <div className="space-y-3">
@@ -165,7 +232,7 @@ export default function AdminPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-charcoal">{u.name}</p>
-                        <p className="text-xs text-warm-gray">{u.email} · {u._count?.lists || 0} lista</p>
+                        <p className="text-xs text-warm-gray">{u.email} &#xB7; {u._count?.lists || 0} lista</p>
                       </div>
                       <button
                         onClick={() => loadUserDetail(u.id)}
@@ -178,7 +245,6 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* User detail modal */}
               {selectedUserList && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-charcoal/30 backdrop-blur-sm">
                   <div className="bg-white rounded-3xl w-full max-w-2xl p-6 shadow-2xl max-h-[80vh] overflow-y-auto">
@@ -203,7 +269,7 @@ export default function AdminPage() {
                               <span className="text-xs text-rose">/lista/{list.shareSlug.slice(0, 8)}...</span>
                             </div>
                             {list.items?.some((i: any) => i.reservation) && (
-                              <p className="text-xs text-sage mt-2">✓ {list.items.filter((i: any) => i.reservation).length} rezervirano</p>
+                              <p className="text-xs text-sage mt-2">&#x2713; {list.items.filter((i: any) => i.reservation).length} rezervirano</p>
                             )}
                           </a>
                         ))}
@@ -221,7 +287,7 @@ export default function AdminPage() {
               <div className="flex gap-3 mb-5">
                 <div className="relative flex-1">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-gray" />
-                  <input type="text" placeholder="Pretraži korisnike..." value={userSearch}
+                  <input type="text" placeholder="Pretrazi korisnike..." value={userSearch}
                     onChange={e => { setUserSearch(e.target.value); setUserPage(1) }}
                     className="w-full pl-9 pr-4 py-2.5 bg-white border border-blush/40 rounded-xl text-sm focus:outline-none" />
                 </div>
@@ -239,7 +305,7 @@ export default function AdminPage() {
                         {u.role === 'ADMIN' && <span className="px-2 py-0.5 bg-rose/10 text-rose text-xs rounded-full font-medium">Admin</span>}
                       </div>
                       <p className="text-sm text-warm-gray">{u.email}</p>
-                      <p className="text-xs text-warm-gray/60 mt-0.5">{u._count.lists} lista · {new Date(u.createdAt).toLocaleDateString('hr-HR')}</p>
+                      <p className="text-xs text-warm-gray/60 mt-0.5">{u._count.lists} lista &#xB7; {new Date(u.createdAt).toLocaleDateString('hr-HR')}</p>
                     </div>
                     <div className="flex gap-2">
                       <button onClick={() => loadUserDetail(u.id)}
@@ -259,10 +325,10 @@ export default function AdminPage() {
               {usersTotal > 20 && (
                 <div className="flex justify-center gap-2 mt-6">
                   <button onClick={() => setUserPage(p => Math.max(1, p - 1))} disabled={userPage === 1}
-                    className="px-4 py-2 border border-blush/40 rounded-full text-sm disabled:opacity-40">← Prethodna</button>
+                    className="px-4 py-2 border border-blush/40 rounded-full text-sm disabled:opacity-40">&#x2190; Prethodna</button>
                   <span className="px-4 py-2 text-sm text-warm-gray">Str. {userPage}</span>
                   <button onClick={() => setUserPage(p => p + 1)} disabled={users.length < 20}
-                    className="px-4 py-2 border border-blush/40 rounded-full text-sm disabled:opacity-40">Sljedeća →</button>
+                    className="px-4 py-2 border border-blush/40 rounded-full text-sm disabled:opacity-40">Sljedeca &#x2192;</button>
                 </div>
               )}
               {selectedUserList && (
@@ -300,26 +366,46 @@ export default function AdminPage() {
           {tab === 'scraper' && (
             <div className="space-y-4">
               {shops.map(shop => (
-                <div key={shop.id} className="bg-white rounded-2xl border border-blush/30 p-5">
+                <div key={shop.id} className={clsx(
+                  'bg-white rounded-2xl border p-5 transition-all',
+                  shop.isActive ? 'border-blush/30' : 'border-warm-gray/20 opacity-60'
+                )}>
                   <div className="flex items-center justify-between gap-4 flex-wrap">
                     <div className="flex items-center gap-3">
                       <div className={clsx('w-2.5 h-2.5 rounded-full',
                         shop.lastStatus === 'success' ? 'bg-sage' : shop.lastStatus === 'error' ? 'bg-rose' : 'bg-warm-gray/30')} />
                       <div>
                         <h3 className="font-medium text-charcoal">{shop.name}</h3>
-                        <p className="text-xs text-warm-gray">{shop.productsCount?.toLocaleString('hr-HR')} proizvoda · {shop.lastStatus || 'nije pokrenut'}</p>
+                        <p className="text-xs text-warm-gray">{shop.productsCount?.toLocaleString('hr-HR')} proizvoda &#xB7; {shop.lastStatus || 'nije pokrenut'}</p>
                       </div>
                     </div>
-                    <button onClick={() => handleScrape(shop.slug)} disabled={scraping[shop.slug]}
-                      className="flex items-center gap-2 px-4 py-2 bg-sage-light/60 text-sage text-sm font-medium rounded-full hover:bg-sage-light transition-colors disabled:opacity-50">
-                      <RefreshCw size={14} className={scraping[shop.slug] ? 'animate-spin' : ''} />
-                      {scraping[shop.slug] ? 'Pokrećem...' : 'Pokreni scraper'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {/* Toggle switch */}
+                      <button
+                        onClick={() => handleToggleShop(shop.slug)}
+                        className={clsx(
+                          'relative inline-flex h-7 w-12 items-center rounded-full transition-colors',
+                          shop.isActive ? 'bg-sage' : 'bg-warm-gray/30'
+                        )}
+                        title={shop.isActive ? 'Iskljuci prikaz' : 'Ukljuci prikaz'}
+                      >
+                        <span className={clsx(
+                          'inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform',
+                          shop.isActive ? 'translate-x-6' : 'translate-x-1'
+                        )} />
+                      </button>
+                      <span className="text-xs text-warm-gray w-8">{shop.isActive ? 'ON' : 'OFF'}</span>
+                      <button onClick={() => handleScrape(shop.slug)} disabled={scraping[shop.slug]}
+                        className="flex items-center gap-2 px-4 py-2 bg-sage-light/60 text-sage text-sm font-medium rounded-full hover:bg-sage-light transition-colors disabled:opacity-50">
+                        <RefreshCw size={14} className={scraping[shop.slug] ? 'animate-spin' : ''} />
+                        {scraping[shop.slug] ? 'Pokrecem...' : 'Pokreni scraper'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
               <div className="p-4 bg-cream rounded-2xl text-sm text-warm-gray">
-                💡 Scraper automatski radi svake noći u <strong>02:00</strong>.
+                Scraper automatski radi svake noci u <strong>02:00</strong>. Kada je shop iskljucen, njegovi proizvodi se ne prikazuju u katalogu.
               </div>
             </div>
           )}
@@ -342,7 +428,7 @@ export default function AdminPage() {
                         </button>
                         {f.product?.imageUrl && <img src={f.product.imageUrl} alt="" className="w-full h-24 object-contain mb-2" />}
                         <p className="text-xs font-medium text-charcoal line-clamp-2">{f.product?.name}</p>
-                        <p className="text-xs text-rose mt-0.5">{f.product?.price?.toFixed(2)} €</p>
+                        <p className="text-xs text-rose mt-0.5">{f.product?.price?.toFixed(2)} &#x20AC;</p>
                       </div>
                     ))}
                   </div>
@@ -351,7 +437,7 @@ export default function AdminPage() {
               <h3 className="text-sm font-medium text-warm-gray uppercase tracking-wide mb-3">Dodaj proizvod</h3>
               <div className="relative mb-4">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-gray" />
-                <input type="text" placeholder="Pretraži proizvode..." value={productSearch}
+                <input type="text" placeholder="Pretrazi proizvode..." value={productSearch}
                   onChange={e => setProductSearch(e.target.value)}
                   className="w-full pl-9 pr-4 py-2.5 bg-white border border-blush/40 rounded-xl text-sm focus:outline-none" />
               </div>
@@ -365,12 +451,129 @@ export default function AdminPage() {
                       {product.imageUrl && <img src={product.imageUrl} alt="" className="w-full h-20 object-contain mb-2" />}
                       <p className="text-xs font-medium text-charcoal line-clamp-2">{product.name}</p>
                       <div className="flex items-center justify-between mt-1">
-                        <p className="text-xs text-rose">{product.price.toFixed(2)} €</p>
-                        {isFeatured ? <span className="text-xs text-gold">⭐</span> : <span className="text-xs text-warm-gray/40">+</span>}
+                        <p className="text-xs text-rose">{product.price.toFixed(2)} &#x20AC;</p>
+                        {isFeatured ? <span className="text-xs text-gold">&#x2B50;</span> : <span className="text-xs text-warm-gray/40">+</span>}
                       </div>
                     </button>
                   )
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* CATEGORIES */}
+          {tab === 'categories' && (
+            <div className="space-y-6">
+              {/* Unmapped categories */}
+              {unmapped.length > 0 && (
+                <div className="bg-white rounded-2xl border border-blush/30 p-5">
+                  <h2 className="font-serif text-xl text-charcoal mb-4">Nemapirane kategorije ({unmapped.length})</h2>
+                  <p className="text-sm text-warm-gray mb-4">Ove kategorije iz shopova jos nemaju mapiranje na nasu kategoriju.</p>
+                  <div className="space-y-3">
+                    {unmapped.slice(0, 20).map((u, i) => (
+                      <div key={i} className="flex items-center gap-3 p-3 border border-blush/20 rounded-xl flex-wrap">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-charcoal">{u.externalName}</p>
+                          <p className="text-xs text-warm-gray">{u.shopSlug} &#xB7; {u.count} proizvoda</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <ArrowRight size={14} className="text-warm-gray/40" />
+                          <select
+                            onChange={e => {
+                              if (e.target.value) handleQuickMap(u.externalName, u.shopSlug, e.target.value)
+                            }}
+                            defaultValue=""
+                            className="px-3 py-1.5 bg-cream border border-blush/40 rounded-lg text-xs focus:outline-none min-w-[180px]"
+                          >
+                            <option value="" disabled>Odaberi kategoriju...</option>
+                            {allCategories.map(c => (
+                              <option key={c.id} value={c.id}>
+                                {c.parent ? `${c.parent.name} > ` : ''}{c.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Existing mappings */}
+              <div className="bg-white rounded-2xl border border-blush/30 p-5">
+                <h2 className="font-serif text-xl text-charcoal mb-4">Postojeca mapiranja ({mappings.length})</h2>
+
+                {/* Add new mapping */}
+                <div className="flex items-end gap-2 mb-4 flex-wrap">
+                  <div className="flex-1 min-w-[150px]">
+                    <label className="text-xs text-warm-gray uppercase tracking-wide block mb-1">Eksterni naziv</label>
+                    <input
+                      type="text"
+                      placeholder="npr. Kolica"
+                      value={newMappingExternal}
+                      onChange={e => setNewMappingExternal(e.target.value)}
+                      className="w-full px-3 py-2 bg-cream border border-blush/40 rounded-lg text-sm focus:outline-none"
+                    />
+                  </div>
+                  <div className="min-w-[120px]">
+                    <label className="text-xs text-warm-gray uppercase tracking-wide block mb-1">Shop (opcionalno)</label>
+                    <input
+                      type="text"
+                      placeholder="babycenter"
+                      value={newMappingShop}
+                      onChange={e => setNewMappingShop(e.target.value)}
+                      className="w-full px-3 py-2 bg-cream border border-blush/40 rounded-lg text-sm focus:outline-none"
+                    />
+                  </div>
+                  <div className="min-w-[180px]">
+                    <label className="text-xs text-warm-gray uppercase tracking-wide block mb-1">Nasa kategorija</label>
+                    <select
+                      value={newMappingCategory}
+                      onChange={e => setNewMappingCategory(e.target.value)}
+                      className="w-full px-3 py-2 bg-cream border border-blush/40 rounded-lg text-sm focus:outline-none"
+                    >
+                      <option value="">Odaberi...</option>
+                      {allCategories.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.parent ? `${c.parent.name} > ` : ''}{c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    onClick={handleCreateMapping}
+                    disabled={!newMappingExternal || !newMappingCategory}
+                    className="px-4 py-2 bg-sage text-white text-sm font-medium rounded-lg hover:bg-sage/90 disabled:opacity-50 transition-colors"
+                  >
+                    Dodaj
+                  </button>
+                </div>
+
+                {/* Mapping list */}
+                {mappings.length === 0 ? (
+                  <p className="text-sm text-warm-gray text-center py-8">Nema mapiranja. Dodaj prvo mapiranje iznad.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {mappings.map(m => (
+                      <div key={m.id} className="flex items-center gap-3 p-3 border border-blush/20 rounded-xl">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="font-medium text-charcoal">{m.externalName}</span>
+                            {m.shopSlug && <span className="text-xs px-1.5 py-0.5 bg-cream rounded text-warm-gray">{m.shopSlug}</span>}
+                            <ArrowRight size={12} className="text-warm-gray/40" />
+                            <span className="text-sage font-medium">{m.category?.name || m.categoryId}</span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteMapping(m.id)}
+                          className="p-1.5 text-warm-gray hover:text-rose transition-colors"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -395,7 +598,7 @@ export default function AdminPage() {
                 </div>
               </div>
               <div className="bg-white rounded-2xl border border-blush/30 p-6">
-                <h2 className="font-serif text-xl text-charcoal mb-4">Opće postavke</h2>
+                <h2 className="font-serif text-xl text-charcoal mb-4">Opce postavke</h2>
                 {[
                   { key: 'siteName', label: 'Naziv stranice', placeholder: 'Bebina Lista' },
                   { key: 'contactEmail', label: 'Kontakt email', placeholder: 'info@bebinalista.hr' },

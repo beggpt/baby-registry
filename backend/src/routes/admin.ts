@@ -88,6 +88,19 @@ adminRouter.get('/shops', async (_, res) => {
   } catch { res.status(500).json({ error: 'Greška na serveru' }) }
 })
 
+// PATCH /api/admin/shops/:slug/toggle — toggle shop isActive
+adminRouter.patch('/shops/:slug/toggle', async (req, res) => {
+  try {
+    const shop = await prisma.scrapedShop.findUnique({ where: { slug: req.params.slug } })
+    if (!shop) return res.status(404).json({ error: 'Shop nije pronađen' })
+    const updated = await prisma.scrapedShop.update({
+      where: { slug: req.params.slug },
+      data: { isActive: !shop.isActive }
+    })
+    res.json(updated)
+  } catch { res.status(500).json({ error: 'Greška na serveru' }) }
+})
+
 // POST /api/admin/shops/:slug/scrape
 adminRouter.post('/shops/:slug/scrape', async (req, res) => {
   const { slug } = req.params
@@ -166,6 +179,101 @@ adminRouter.get('/products', async (req, res) => {
       prisma.product.count({ where })
     ])
     res.json({ products, total, totalPages: Math.ceil(total / 50) })
+  } catch { res.status(500).json({ error: 'Greška na serveru' }) }
+})
+
+// ===== CATEGORY MAPPINGS =====
+
+// GET /api/admin/category-mappings
+adminRouter.get('/category-mappings', async (_, res) => {
+  try {
+    const mappings = await prisma.categoryMapping.findMany({
+      include: { category: true },
+      orderBy: { externalName: 'asc' }
+    })
+    res.json(mappings)
+  } catch { res.status(500).json({ error: 'Greška na serveru' }) }
+})
+
+// POST /api/admin/category-mappings
+adminRouter.post('/category-mappings', async (req, res) => {
+  try {
+    const { externalName, shopSlug, categoryId } = req.body
+    if (!externalName || !categoryId) {
+      return res.status(400).json({ error: 'externalName i categoryId su obavezni' })
+    }
+    const mapping = await prisma.categoryMapping.create({
+      data: { externalName, shopSlug: shopSlug || null, categoryId },
+      include: { category: true }
+    })
+    res.status(201).json(mapping)
+  } catch (err: any) {
+    if (err?.code === 'P2002') return res.status(409).json({ error: 'Ovo mapiranje već postoji' })
+    res.status(500).json({ error: 'Greška na serveru' })
+  }
+})
+
+// DELETE /api/admin/category-mappings/:id
+adminRouter.delete('/category-mappings/:id', async (req, res) => {
+  try {
+    await prisma.categoryMapping.delete({ where: { id: req.params.id } })
+    res.json({ success: true })
+  } catch { res.status(500).json({ error: 'Greška na serveru' }) }
+})
+
+// GET /api/admin/unmapped-categories — external category names from products without mappings
+adminRouter.get('/unmapped-categories', async (_, res) => {
+  try {
+    // Get all distinct external category names from products (using category name)
+    const products = await prisma.product.findMany({
+      where: { category: { isNot: null } },
+      select: { category: { select: { name: true } }, shopSlug: true },
+      distinct: ['categoryId'],
+    })
+
+    const mappings = await prisma.categoryMapping.findMany({
+      select: { externalName: true, shopSlug: true }
+    })
+
+    const mappedSet = new Set(mappings.map(m => `${m.externalName}||${m.shopSlug || ''}`))
+
+    // Find category names from products that are not in mappings
+    const unmapped: Array<{ externalName: string; shopSlug: string; count: number }> = []
+    const seen = new Set<string>()
+
+    for (const p of products) {
+      if (!p.category) continue
+      const key = `${p.category.name}||${p.shopSlug}`
+      if (seen.has(key) || mappedSet.has(key)) continue
+      seen.add(key)
+
+      const count = await prisma.product.count({
+        where: {
+          category: { name: p.category.name },
+          shopSlug: p.shopSlug
+        }
+      })
+
+      unmapped.push({
+        externalName: p.category.name,
+        shopSlug: p.shopSlug,
+        count
+      })
+    }
+
+    unmapped.sort((a, b) => b.count - a.count)
+    res.json(unmapped)
+  } catch { res.status(500).json({ error: 'Greška na serveru' }) }
+})
+
+// GET /api/admin/categories — all categories for dropdown
+adminRouter.get('/categories', async (_, res) => {
+  try {
+    const categories = await prisma.category.findMany({
+      include: { parent: true },
+      orderBy: { name: 'asc' }
+    })
+    res.json(categories)
   } catch { res.status(500).json({ error: 'Greška na serveru' }) }
 })
 
