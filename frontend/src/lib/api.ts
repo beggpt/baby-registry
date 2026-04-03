@@ -64,10 +64,14 @@ export const listsApi = {
   delete: (id: string) => api.delete(`/lists/${id}`),
   addItem: (listId: string, productId: string, priority = 'MEDIUM', note?: string) =>
     api.post(`/lists/${listId}/items`, { productId, priority, note }),
+  addCustomItem: (listId: string, customProduct: { name: string; price?: number; imageUrl?: string; productUrl?: string; description?: string }, priority = 'MEDIUM', note?: string) =>
+    api.post(`/lists/${listId}/items`, { customProduct, priority, note }),
   updateItem: (listId: string, itemId: string, data: any) =>
     api.patch(`/lists/${listId}/items/${itemId}`, data),
   removeItem: (listId: string, itemId: string) =>
     api.delete(`/lists/${listId}/items/${itemId}`),
+  smartPaste: (url: string) =>
+    api.post('/lists/smart-paste', { url }),
 }
 
 export const productsApi = {
@@ -85,6 +89,12 @@ export const publicApi = {
   getList: (slug: string) => api.get(`/public/lista/${slug}`),
   reserve: (slug: string, itemId: string, reservedBy: string, note?: string) =>
     api.post(`/public/lista/${slug}/rezerviraj/${itemId}`, { reservedBy, note }),
+  reserveGroupBuy: (slug: string, itemId: string, data: { reservedBy: string; note?: string; isGroupBuy: true; targetAmount: number; amount: number; role: 'ORDERER' | 'CONTRIBUTOR' }) =>
+    api.post(`/public/lista/${slug}/rezerviraj/${itemId}`, data),
+  joinGroupBuy: (slug: string, itemId: string, data: { name: string; role: 'ORDERER' | 'CONTRIBUTOR'; amount: number; note?: string }) =>
+    api.post(`/public/lista/${slug}/group/${itemId}/join`, data),
+  leaveGroupBuy: (slug: string, itemId: string, contributorId: string) =>
+    api.delete(`/public/lista/${slug}/group/${itemId}/leave/${contributorId}`),
   cancelReservation: (slug: string, itemId: string, reservedBy: string) =>
     api.delete(`/public/lista/${slug}/rezerviraj/${itemId}`, { data: { reservedBy } }),
 }
@@ -92,6 +102,7 @@ export const publicApi = {
 export const adminApi = {
   getStats: () => api.get('/admin/stats'),
   getShops: () => api.get('/admin/shops'),
+  toggleShop: (slug: string) => api.patch(`/admin/shops/${slug}/toggle`),
   triggerScrape: (slug: string) => api.post(`/admin/shops/${slug}/scrape`),
   getUsers: (params?: { page?: number; q?: string }) => api.get('/admin/users', { params }),
   getUser: (id: string) => api.get(`/admin/users/${id}`),
@@ -103,6 +114,12 @@ export const adminApi = {
   setSetting: (key: string, value: string) => api.put(`/admin/settings/${key}`, { value }),
   getProducts: (params?: { page?: number; q?: string; shop?: string }) =>
     api.get('/admin/products', { params }),
+  getCategoryMappings: () => api.get('/admin/category-mappings'),
+  createCategoryMapping: (data: { externalName: string; shopSlug?: string; categoryId: string }) =>
+    api.post('/admin/category-mappings', data),
+  deleteCategoryMapping: (id: string) => api.delete(`/admin/category-mappings/${id}`),
+  getUnmappedCategories: () => api.get('/admin/unmapped-categories'),
+  getCategories: () => api.get('/admin/categories'),
 }
 
 // Dodaj search endpoint

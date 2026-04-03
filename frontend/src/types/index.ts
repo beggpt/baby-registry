@@ -3,6 +3,7 @@ export type ReservationStatus = 'RESERVED' | 'PURCHASED'
 export type BabyGender = 'boy' | 'girl' | 'surprise'
 export type Occasion = 'birth' | 'birthday' | 'other'
 export type Role = 'USER' | 'ADMIN'
+export type ContributorRole = 'ORDERER' | 'CONTRIBUTOR'
 
 export interface User {
   id: string
@@ -43,6 +44,16 @@ export interface Product {
   createdAt: string
 }
 
+export interface GroupContributor {
+  id: string
+  reservationId: string
+  name: string
+  role: ContributorRole
+  amount: number
+  note?: string
+  createdAt: string
+}
+
 export interface Reservation {
   id: string
   listItemId: string
@@ -50,6 +61,27 @@ export interface Reservation {
   reservedAt: string
   status: ReservationStatus
   note?: string
+  isGroupBuy?: boolean
+  targetAmount?: number
+  contributors?: GroupContributor[]
+}
+
+export interface SmartPasteResult {
+  title: string
+  imageUrl?: string
+  description?: string
+  price?: number
+  shopName?: string
+  productUrl: string
+}
+
+export interface CategoryMapping {
+  id: string
+  externalName: string
+  shopSlug?: string
+  categoryId: string
+  category?: Category
+  createdAt: string
 }
 
 export interface ListItem {

@@ -16,6 +16,16 @@ productsRouter.get('/', async (req, res) => {
     const take = Math.min(parseInt(limit), 100)
     const where: any = {}
 
+    // Only show products from active shops
+    const activeShops = await prisma.scrapedShop.findMany({
+      where: { isActive: true },
+      select: { slug: true }
+    })
+    const activeSlugs = activeShops.map(s => s.slug)
+    // Also include 'custom' shop (manually added products)
+    activeSlugs.push('custom')
+    where.shopSlug = { in: activeSlugs }
+
     if (q) {
       where.OR = [
         { name: { contains: q, mode: 'insensitive' } },
