@@ -9,6 +9,9 @@ dist/
 Thumbs.db
 *.zip
 
+# Claude Code
+.claude/
+
 # Playwright
 playwright-report/
 test-results/
