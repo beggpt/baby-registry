@@ -46,114 +46,133 @@ interface ScrapedProduct {
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
+const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+
 function parseHRPrice(text: string): number {
-  // "1.299,99 €" → 1299.99
   const cleaned = text.replace(/[€\s\u00a0]/g, '').replace(/\./g, '').replace(',', '.')
   const val = parseFloat(cleaned)
   return isNaN(val) ? 0 : val
 }
 
-async function scrapeProducts(page: Page): Promise<ScrapedProduct[]> {
-  return page.evaluate((baseUrl) => {
-    const results: any[] = []
+async function fetchPage(url: string): Promise<cheerio.CheerioAPI | null> {
+  try {
+    const { data } = await axios.get(url, {
+      headers: {
+        'User-Agent': USER_AGENT,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'hr-HR,hr;q=0.9,en;q=0.8',
+      },
+      timeout: 30000,
+    })
+    return cheerio.load(data)
+  } catch (err) {
+    console.error(`   Fetch error: ${url} — ${(err as Error).message}`)
+    return null
+  }
+}
 
-    // Baby Centar product card selectors (try multiple)
-    const cardSels = [
-      '.product-item', '.product-tile', '.product-card',
-      '[class*="product-item"]', '[class*="product-tile"]',
-      'li.item.product', '.products-grid li',
-    ]
+function scrapeProducts($: cheerio.CheerioAPI): ScrapedProduct[] {
+  const results: ScrapedProduct[] = []
+  const seen = new Set<string>()
 
-    let cards: Element[] = []
-    for (const sel of cardSels) {
-      const found = Array.from(document.querySelectorAll(sel))
-      if (found.length > 2) { cards = found; break }
-    }
+  // Try common product card selectors
+  const cardSelectors = [
+    '.product-item',
+    '.product-tile',
+    '.product-card',
+    '[class*="product-item"]',
+    '[class*="product-tile"]',
+    'li.item.product',
+    '.products-grid li',
+  ]
 
-    // Fallback: scrape direct product links
-    if (cards.length === 0) {
-      const seen = new Set<string>()
-      document.querySelectorAll('a[href]').forEach(el => {
-        const href = (el as HTMLAnchorElement).href
-        if (!href.startsWith(baseUrl) || seen.has(href)) return
-        // Baby Centar product URLs usually end with .html or contain product name
-        if (!href.match(/\.(html|htm)$/) && !href.match(/\/[a-z0-9-]+-[0-9]+\/?$/)) return
-        if (href.includes('/akcije') || href.includes('/login') || href.includes('/cart')) return
+  let $cards = $('')
+  for (const sel of cardSelectors) {
+    const found = $(sel)
+    if (found.length > 2) { $cards = found; break }
+  }
 
-        const nameEl = el.querySelector('h2,h3,h4,[class*="name"],[class*="title"]')
-        const name = nameEl?.textContent?.trim() || el.textContent?.trim()
-        if (!name || name.length < 3 || name.length > 200) return
-
-        const container = el.closest('li, div[class*="product"], article')
-        const priceEl = container?.querySelector('[class*="price"]')
-        const priceText = priceEl?.textContent?.trim() || ''
-        const price = parseFloat(priceText.replace(/[€\s.]/g, '').replace(',', '.')) || 0
-
-        const imgEl = (container || el).querySelector('img')
-        const imageUrl = imgEl?.getAttribute('data-src') || imgEl?.src || ''
-
-        seen.add(href)
-        results.push({ name, price, imageUrl: imageUrl.startsWith('//') ? 'https:' + imageUrl : imageUrl, productUrl: href, inStock: true })
-      })
-      return results
-    }
-
-    cards.forEach(card => {
+  if ($cards.length > 0) {
+    $cards.each((_, card) => {
       try {
-        const nameEl = card.querySelector([
-          'h2', 'h3', 'h4',
-          '.product-item-name', '.product-name', '.product-title',
-          '[class*="product-name"]', '[class*="product-title"]',
-          '[class*="item-name"]',
-        ].join(','))
-        const name = nameEl?.textContent?.trim()
+        const $card = $(card)
+
+        // Name
+        const nameEl = $card.find('h2, h3, h4, .product-item-name, .product-name, .product-title, [class*="product-name"], [class*="product-title"], [class*="item-name"]').first()
+        const name = nameEl.text().trim()
         if (!name || name.length < 3) return
 
-        const linkEl = card.querySelector('a[href]') as HTMLAnchorElement
-        const productUrl = linkEl?.href
-        if (!productUrl?.startsWith(baseUrl)) return
+        // URL
+        const linkEl = $card.find('a[href]').first()
+        let productUrl = linkEl.attr('href') || ''
+        if (productUrl.startsWith('/')) productUrl = BASE_URL + productUrl
+        if (!productUrl.startsWith(BASE_URL)) return
+        if (seen.has(productUrl)) return
+        seen.add(productUrl)
 
-        const priceEl = card.querySelector([
-          '.price', '.special-price .price', '.price-final_price',
-          '[class*="price-final"]', '[class*="price-regular"]', '[class*="price"]',
-        ].join(','))
-        const priceText = priceEl?.textContent?.trim() || ''
-        const price = parseFloat(
-          priceText.replace(/[€\s\u00a0]/g, '').replace(/\./g, '').replace(',', '.')
-        ) || 0
+        // Price
+        const priceEl = $card.find('.price, .special-price .price, .price-final_price, [class*="price-final"], [class*="price-regular"], [class*="price"]').first()
+        const price = parseHRPrice(priceEl.text())
 
-        const imgEl = card.querySelector('img') as HTMLImageElement
-        let imageUrl = imgEl?.getAttribute('data-src') || imgEl?.getAttribute('data-lazy') || imgEl?.src || ''
+        // Image
+        const imgEl = $card.find('img').first()
+        let imageUrl = imgEl.attr('data-src') || imgEl.attr('data-lazy') || imgEl.attr('src') || ''
         if (imageUrl.startsWith('//')) imageUrl = 'https:' + imageUrl
 
-        const outOfStock = !!card.querySelector('[class*="out-of-stock"],[class*="unavailable"],[class*="sold-out"]')
+        // Stock
+        const outOfStock = $card.find('[class*="out-of-stock"], [class*="unavailable"], [class*="sold-out"]').length > 0
 
         if (name && productUrl && price > 0) {
           results.push({ name, price, imageUrl, productUrl, inStock: !outOfStock })
         }
       } catch {}
     })
+  }
 
-    return results
-  }, BASE_URL)
+  // Fallback: scrape product links directly
+  if (results.length === 0) {
+    $('a[href]').each((_, el) => {
+      const $el = $(el)
+      let href = $el.attr('href') || ''
+      if (href.startsWith('/')) href = BASE_URL + href
+      if (!href.startsWith(BASE_URL) || seen.has(href)) return
+      if (!href.match(/\.(html|htm)$/) && !href.match(/\/[a-z0-9-]+-[0-9]+\/?$/)) return
+      if (href.includes('/akcije') || href.includes('/login') || href.includes('/cart')) return
+
+      const container = $el.closest('li, div[class*="product"], article')
+      const nameEl = $el.find('h2, h3, h4, [class*="name"], [class*="title"]').first()
+      const name = nameEl.text().trim() || $el.text().trim()
+      if (!name || name.length < 3 || name.length > 200) return
+
+      const priceEl = container.find('[class*="price"]').first()
+      const price = parseHRPrice(priceEl.text())
+
+      const imgEl = container.find('img').first()
+      let imageUrl = imgEl.attr('data-src') || imgEl.attr('src') || ''
+      if (imageUrl.startsWith('//')) imageUrl = 'https:' + imageUrl
+
+      seen.add(href)
+      results.push({ name, price, imageUrl, productUrl: href, inStock: true })
+    })
+  }
+
+  return results
 }
 
-async function getLastPage(page: Page): Promise<number> {
-  return page.evaluate(() => {
-    const sels = ['.pagination a', '.pages-items a', '[class*="pagination"] a', '[class*="pager"] a']
-    let max = 1
-    for (const sel of sels) {
-      document.querySelectorAll(sel).forEach(el => {
-        const num = parseInt(el.textContent?.trim() || '0')
-        if (num > max) max = num
-        const href = (el as HTMLAnchorElement).href || ''
-        const m = href.match(/[?&]page=(\d+)/) || href.match(/\/p\/(\d+)/)
-        if (m && parseInt(m[1]) > max) max = parseInt(m[1])
-      })
-      if (max > 1) break
-    }
-    return max
-  })
+function getLastPage($: cheerio.CheerioAPI): number {
+  let max = 1
+  const paginationSels = ['.pagination a', '.pages-items a', '[class*="pagination"] a', '[class*="pager"] a']
+  for (const sel of paginationSels) {
+    $(sel).each((_, el) => {
+      const num = parseInt($(el).text().trim() || '0')
+      if (num > max) max = num
+      const href = $(el).attr('href') || ''
+      const m = href.match(/[?&]page=(\d+)/) || href.match(/\/p\/(\d+)/)
+      if (m && parseInt(m[1]) > max) max = parseInt(m[1])
+    })
+    if (max > 1) break
+  }
+  return max
 }
 
 async function upsertCategory(name: string, slug: string, parentId?: string | null) {
@@ -200,29 +219,10 @@ export async function runBabyCenterScraper() {
     parentIdMap[slug] = cat.id
   }
 
-  let browser: Browser | null = null
   let totalScraped = 0
   let totalErrors = 0
 
   try {
-    browser = await chromium.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process'],
-    })
-
-    const ctx = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-      locale: 'hr-HR',
-      viewport: { width: 1440, height: 900 },
-    })
-
-    // Blokiraj reklame i trackers za brzinu
-    await ctx.route(/\.(png|jpg|jpeg|gif|webp|svg|woff2?|ttf|eot)(\?.*)?$/, r => r.abort())
-    await ctx.route(/(google-analytics|googletagmanager|facebook\.net|hotjar|doubleclick)/, r => r.abort())
-
-    const page = await ctx.newPage()
-    page.setDefaultTimeout(30000)
-
     for (const target of SCRAPE_TARGETS) {
       const parentId = target.parentSlug ? (parentIdMap[target.parentSlug] ?? null) : null
       const category = await upsertCategory(target.name, target.slug, parentId)
@@ -230,36 +230,38 @@ export async function runBabyCenterScraper() {
       console.log(`\n📂 ${target.name}`)
 
       try {
-        await page.goto(BASE_URL + target.url, { waitUntil: 'domcontentloaded', timeout: 40000 })
-        await sleep(2500)
+        const $ = await fetchPage(BASE_URL + target.url)
+        if (!$) { totalErrors++; continue }
 
-        const totalPages = await getLastPage(page)
+        const totalPages = getLastPage($)
         const maxPages = Math.min(totalPages, 20)
         console.log(`   ${totalPages} stranica → scrapam ${maxPages}`)
 
-        for (let pg = 1; pg <= maxPages; pg++) {
-          if (pg > 1) {
-            await page.goto(`${BASE_URL}${target.url}?page=${pg}`, { waitUntil: 'domcontentloaded', timeout: 40000 })
-            await sleep(1800 + Math.random() * 700)
-          }
+        // First page
+        const firstProducts = scrapeProducts($)
+        let saved = 0
+        for (const p of firstProducts) {
+          if (!p.name || !p.productUrl || p.price <= 0) continue
+          try { await upsertProduct(p, category.id); saved++; totalScraped++ }
+          catch (e) { totalErrors++; if (totalErrors <= 5) console.error(`   ⚠️  ${p.name.substring(0, 40)}: ${e}`) }
+        }
+        console.log(`   Str 1/${maxPages}: ${firstProducts.length} pronađeno, ${saved} spremljeno`)
 
-          const products = await scrapeProducts(page)
-          let saved = 0
+        // Remaining pages
+        for (let pg = 2; pg <= maxPages; pg++) {
+          await sleep(1800 + Math.random() * 700)
 
+          const $page = await fetchPage(`${BASE_URL}${target.url}?page=${pg}`)
+          if (!$page) continue
+
+          const products = scrapeProducts($page)
+          saved = 0
           for (const p of products) {
             if (!p.name || !p.productUrl || p.price <= 0) continue
-            try {
-              await upsertProduct(p, category.id)
-              saved++
-              totalScraped++
-            } catch (e) {
-              totalErrors++
-              if (totalErrors <= 5) console.error(`   ⚠️  ${p.name.substring(0, 40)}: ${e}`)
-            }
+            try { await upsertProduct(p, category.id); saved++; totalScraped++ }
+            catch (e) { totalErrors++; if (totalErrors <= 5) console.error(`   ⚠️  ${p.name.substring(0, 40)}: ${e}`) }
           }
-
           console.log(`   Str ${pg}/${maxPages}: ${products.length} pronađeno, ${saved} spremljeno`)
-          await sleep(600 + Math.random() * 400)
         }
       } catch (err) {
         console.error(`   ❌ ${target.name}: ${(err as Error).message}`)
@@ -268,8 +270,6 @@ export async function runBabyCenterScraper() {
 
       await sleep(2000 + Math.random() * 1500)
     }
-
-    await ctx.close()
 
     const finalStatus = totalScraped > 0 ? 'success' : 'error'
     await prisma.scrapedShop.update({
@@ -289,8 +289,6 @@ export async function runBabyCenterScraper() {
       where: { slug: SHOP_SLUG },
       data: { lastStatus: 'error', errorMsg: String(err), lastRun: new Date() }
     }).catch(() => {})
-  } finally {
-    if (browser) await browser.close()
   }
 
   return { totalScraped, totalErrors }
