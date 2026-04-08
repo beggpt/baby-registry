@@ -14,14 +14,14 @@ import clsx from 'clsx'
 import { addRefToUrl } from '@/lib/api'
 
 const PRIORITY_CONFIG = {
-  HIGH:   { label: '&#x2764;&#xFE0F; Jako zelim',    cls: 'priority-HIGH' },
-  MEDIUM: { label: '&#x1F33F; Bilo bi lijepo', cls: 'priority-MEDIUM' },
-  LOW:    { label: '&#x2728; Luksuz',         cls: 'priority-LOW' },
+  HIGH:   { label: '❤️ Jako želim',    cls: 'priority-HIGH' },
+  MEDIUM: { label: '🌿 Bilo bi lijepo', cls: 'priority-MEDIUM' },
+  LOW:    { label: '✨ Luksuz',         cls: 'priority-LOW' },
 }
 
 const OCCASIONS = [
-  { value: 'birth',    emoji: '&#x1F37C;', label: 'Rodjenje djeteta', dateLabel: 'Planirani termin poroda' },
-  { value: 'birthday', emoji: '&#x1F382;', label: 'Djecji rodjendan',  dateLabel: 'Datum rodjendana' },
+  { value: 'birth',    emoji: '🍼', label: 'Rođenje djeteta', dateLabel: 'Planirani termin poroda' },
+  { value: 'birthday', emoji: '🎂', label: 'Dječji rođendan',  dateLabel: 'Datum rođendana' },
 ]
 
 function parseDMY(s: string): Date | null {
@@ -53,7 +53,7 @@ function SmartPasteModal({ listId, onClose, onSuccess }: {
       const res = await listsApi.smartPaste(url.trim())
       setResult(res.data)
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Nije moguce dohvatiti podatke s tog linka')
+      setError(err.response?.data?.error || 'Nije moguće dohvatiti podatke s tog linka')
     } finally {
       setLoading(false)
     }
@@ -73,7 +73,7 @@ function SmartPasteModal({ listId, onClose, onSuccess }: {
       onSuccess(res.data)
       onClose()
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Greska pri spremanju')
+      setError(err.response?.data?.error || 'Greška pri spremanju')
       setSaving(false)
     }
   }
@@ -86,12 +86,12 @@ function SmartPasteModal({ listId, onClose, onSuccess }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-charcoal/30 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl fade-up max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-charcoal/30 backdrop-blur-sm">
+      <div className="bg-white sm:rounded-3xl rounded-t-3xl w-full sm:max-w-md p-5 sm:p-6 shadow-2xl fade-up max-h-[100dvh] sm:max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-5">
-          <h3 className="font-serif text-xl">Dodaj s linka &#x1F517;</h3>
-          <button onClick={onClose} className="p-1.5 hover:bg-cream rounded-full transition-colors">
-            <X size={18} className="text-warm-gray" />
+          <h3 className="font-serif text-xl">Dodaj s linka 🔗</h3>
+          <button onClick={onClose} className="p-2 hover:bg-cream rounded-full transition-colors -mr-1">
+            <X size={20} className="text-warm-gray" />
           </button>
         </div>
 
@@ -101,18 +101,18 @@ function SmartPasteModal({ listId, onClose, onSuccess }: {
           <div className="flex gap-2">
             <input
               type="url"
-              placeholder="Zalijepi link proizvoda ovdje..."
+              placeholder="Zalijepi link ovdje..."
               value={url}
               onChange={e => setUrl(e.target.value)}
               onPaste={handlePaste}
               onKeyDown={e => e.key === 'Enter' && handleFetch()}
-              className="flex-1 px-4 py-3 bg-cream border border-blush/40 rounded-xl text-sm focus:outline-none focus:border-rose"
+              className="flex-1 px-4 py-3 bg-cream border border-blush/40 rounded-xl text-sm text-base-mobile focus:outline-none focus:border-rose min-w-0"
               autoFocus
             />
             <button
               onClick={handleFetch}
               disabled={!url.trim() || loading}
-              className="px-4 py-3 bg-rose text-white rounded-xl text-sm font-medium hover:bg-rose/90 disabled:opacity-50 transition-colors flex-shrink-0"
+              className="px-4 py-3 bg-rose text-white rounded-xl text-sm font-medium hover:bg-rose/90 disabled:opacity-50 transition-colors flex-shrink-0 active:scale-[0.97]"
             >
               {loading ? <Loader2 size={16} className="animate-spin" /> : 'Dohvati'}
             </button>
@@ -148,10 +148,11 @@ function SmartPasteModal({ listId, onClose, onSuccess }: {
                   <button
                     key={val}
                     onClick={() => setPriority(val)}
-                    className={clsx('flex-1 py-2 rounded-xl text-xs font-medium border transition-all',
+                    className={clsx('flex-1 py-2 rounded-xl text-xs font-medium border transition-all active:scale-[0.97]',
                       priority === val ? 'border-rose bg-blush/20' : 'border-blush/40 text-warm-gray hover:border-blush-mid')}
-                    dangerouslySetInnerHTML={{ __html: conf.label }}
-                  />
+                  >
+                    {conf.label}
+                  </button>
                 ))}
               </div>
             </div>
@@ -159,7 +160,7 @@ function SmartPasteModal({ listId, onClose, onSuccess }: {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="w-full py-3 bg-rose text-white font-medium rounded-full hover:bg-rose/90 transition-colors disabled:opacity-50"
+              className="w-full py-3 bg-rose text-white font-medium rounded-full hover:bg-rose/90 transition-colors disabled:opacity-50 active:scale-[0.97]"
             >
               {saving ? 'Dodajem...' : 'Dodaj na listu'}
             </button>
@@ -209,10 +210,10 @@ function ListItemRow({ item, listId, onDelete, onPriorityChange }: {
       )}
     >
       {/* Slika */}
-      <div className="w-14 h-14 flex-shrink-0 bg-cream rounded-xl overflow-hidden">
+      <div className="w-12 h-12 sm:w-14 sm:h-14 flex-shrink-0 bg-cream rounded-xl overflow-hidden">
         {product.imageUrl
           ? <img src={product.imageUrl} alt="" className="w-full h-full object-contain p-1" />
-          : <div className="w-full h-full flex items-center justify-center text-xl opacity-20">&#x1F37C;</div>
+          : <div className="w-full h-full flex items-center justify-center text-lg sm:text-xl opacity-20">🍼</div>
         }
       </div>
 
@@ -233,14 +234,14 @@ function ListItemRow({ item, listId, onDelete, onPriorityChange }: {
             className={clsx('text-xs px-2 py-0.5 rounded-full border-0 cursor-pointer focus:outline-none font-medium', PRIORITY_CONFIG[item.priority].cls)}
           >
             {Object.entries(PRIORITY_CONFIG).map(([val, conf]) => (
-              <option key={val} value={val}>{val === 'HIGH' ? 'Jako zelim' : val === 'MEDIUM' ? 'Bilo bi lijepo' : 'Luksuz'}</option>
+              <option key={val} value={val}>{val === 'HIGH' ? 'Jako želim' : val === 'MEDIUM' ? 'Bilo bi lijepo' : 'Luksuz'}</option>
             ))}
           </select>
           {reservation && !isGroupBuy
-            ? <span className="text-xs px-2 py-0.5 bg-gold/20 text-gold rounded-full font-medium">&#x1F381; {reservation.reservedBy}</span>
+            ? <span className="text-xs px-2 py-0.5 bg-gold/20 text-gold rounded-full font-medium">🎁 {reservation.reservedBy}</span>
             : isGroupBuy
-            ? <span className="text-xs px-2 py-0.5 bg-sage-light/60 text-sage rounded-full font-medium">&#x1F465; Grupna kupovina ({contributors.length} osoba)</span>
-            : <span className="text-xs px-2 py-0.5 status-available rounded-full">&#x2713; Slobodno</span>
+            ? <span className="text-xs px-2 py-0.5 bg-sage-light/60 text-sage rounded-full font-medium">👥 Grupna ({contributors.length})</span>
+            : <span className="text-xs px-2 py-0.5 status-available rounded-full">✓ Slobodno</span>
           }
         </div>
 
@@ -272,16 +273,16 @@ function ListItemRow({ item, listId, onDelete, onPriorityChange }: {
               />
             </div>
             {progressPercent >= 100 && (
-              <p className="text-xs text-sage font-medium mb-2">&#x1F389; Cilj dostignut!</p>
+              <p className="text-xs text-sage font-medium mb-2">🎉 Cilj dostignut!</p>
             )}
             {/* Contributors */}
             <div className="space-y-1">
               {contributors.map((c: GroupContributor) => (
-                <div key={c.id} className="flex items-center gap-2 text-xs">
-                  <span>{c.role === 'ORDERER' ? '&#x1F6D2;' : '&#x1F4B0;'}</span>
+                <div key={c.id} className="flex items-center gap-2 text-xs flex-wrap">
+                  <span>{c.role === 'ORDERER' ? '🛒' : '💰'}</span>
                   <span className="font-medium text-charcoal">{c.name}</span>
                   <span className="text-warm-gray">{c.amount.toFixed(2)} EUR</span>
-                  {c.note && <span className="text-warm-gray/60 italic truncate">- {c.note}</span>}
+                  {c.note && <span className="text-warm-gray/60 italic truncate max-w-[100px]">- {c.note}</span>}
                 </div>
               ))}
             </div>
@@ -292,10 +293,10 @@ function ListItemRow({ item, listId, onDelete, onPriorityChange }: {
       {/* Brisanje */}
       <button
         onClick={handleDelete}
-        className="p-1.5 text-warm-gray hover:text-rose transition-colors flex-shrink-0 self-start"
+        className="p-2 text-warm-gray hover:text-rose transition-colors flex-shrink-0 self-start -mr-1"
         title="Ukloni s liste"
       >
-        <Trash2 size={13} />
+        <Trash2 size={14} />
       </button>
     </div>
   )
@@ -345,10 +346,10 @@ function EditableListName({ name, onSave }: { name: string; onSave: (newName: st
   return (
     <button
       onClick={() => setEditing(true)}
-      className="flex items-center gap-1.5 font-medium text-charcoal hover:text-rose transition-colors group min-w-0"
-      title="Klikni za uredjivanje naziva"
+      className="flex items-center gap-1.5 font-medium text-charcoal hover:text-rose transition-colors group min-w-0 text-left"
+      title="Klikni za uređivanje naziva"
     >
-      <span className="truncate">{name}</span>
+      <span className="truncate text-sm">{name}</span>
       <Edit3 size={12} className="text-warm-gray/40 group-hover:text-rose transition-colors flex-shrink-0" />
     </button>
   )
@@ -359,7 +360,7 @@ function ShareModal({ slug, listName, onClose }: { slug: string; listName: strin
   const [copied, setCopied] = useState(false)
   const [qrDataUrl, setQrDataUrl] = useState<string>('')
   const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/lista/${slug}` : ''
-  const shareText = `Pogledaj moju baby listu "${listName}" &#x1F380;`
+  const shareText = `Pogledaj moju baby listu "${listName}" 🎀`
 
   useEffect(() => {
     if (!shareUrl) return
@@ -388,13 +389,13 @@ function ShareModal({ slug, listName, onClose }: { slug: string; listName: strin
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-charcoal/40 backdrop-blur-sm fade-in">
-      <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden fade-up">
-        <div className="p-6">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-charcoal/40 backdrop-blur-sm fade-in">
+      <div className="bg-white sm:rounded-3xl rounded-t-3xl w-full sm:max-w-md shadow-2xl overflow-hidden fade-up max-h-[100dvh] sm:max-h-[90vh] overflow-y-auto">
+        <div className="p-5 sm:p-6">
           <div className="flex justify-between items-start mb-5">
             <h3 className="font-serif text-xl text-charcoal">Podijeli listu</h3>
-            <button onClick={onClose} className="p-1.5 hover:bg-cream rounded-full transition-colors">
-              <X size={18} className="text-warm-gray" />
+            <button onClick={onClose} className="p-2 hover:bg-cream rounded-full transition-colors -mr-1 -mt-1">
+              <X size={20} className="text-warm-gray" />
             </button>
           </div>
 
@@ -404,41 +405,39 @@ function ShareModal({ slug, listName, onClose }: { slug: string; listName: strin
               type="text"
               value={shareUrl}
               readOnly
-              className="flex-1 px-3 py-2.5 bg-cream border border-blush/40 rounded-xl text-xs text-charcoal font-mono truncate"
+              className="flex-1 px-3 py-2.5 bg-cream border border-blush/40 rounded-xl text-xs text-charcoal font-mono truncate min-w-0"
             />
             <button
               onClick={copyLink}
-              className="px-4 py-2.5 bg-charcoal text-white text-xs font-medium rounded-xl hover:bg-charcoal/90 transition-colors whitespace-nowrap"
+              className="px-4 py-2.5 bg-charcoal text-white text-xs font-medium rounded-xl hover:bg-charcoal/90 transition-colors whitespace-nowrap flex-shrink-0 active:scale-[0.97]"
             >
-              {copied ? '&#x2713; Kopirano!' : 'Kopiraj'}
+              {copied ? '✓ Kopirano!' : 'Kopiraj'}
             </button>
           </div>
 
           {/* Share buttons */}
-          <div className="grid grid-cols-2 gap-2 mb-5">
+          <div className="grid grid-cols-3 gap-2 mb-5">
             <a
               href={`https://wa.me/?text=${encodeURIComponent(shareText + '\n' + shareUrl)}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 px-4 py-3 bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/20 rounded-xl text-sm font-medium hover:bg-[#25D366]/20 transition-colors"
+              className="flex items-center justify-center gap-1.5 px-3 py-3 bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/20 rounded-xl text-sm font-medium hover:bg-[#25D366]/20 transition-colors active:scale-[0.97]"
             >
               WhatsApp
             </a>
             <a
               href={`viber://forward?text=${encodeURIComponent(shareText + '\n' + shareUrl)}`}
-              className="flex items-center justify-center gap-2 px-4 py-3 bg-[#7360F2]/10 text-[#7360F2] border border-[#7360F2]/20 rounded-xl text-sm font-medium hover:bg-[#7360F2]/20 transition-colors"
+              className="flex items-center justify-center gap-1.5 px-3 py-3 bg-[#7360F2]/10 text-[#7360F2] border border-[#7360F2]/20 rounded-xl text-sm font-medium hover:bg-[#7360F2]/20 transition-colors active:scale-[0.97]"
             >
               Viber
             </a>
+            <a
+              href={`fb-messenger://share/?link=${encodeURIComponent(shareUrl)}`}
+              className="flex items-center justify-center gap-1.5 px-3 py-3 bg-[#0084FF]/10 text-[#0084FF] border border-[#0084FF]/20 rounded-xl text-sm font-medium hover:bg-[#0084FF]/20 transition-colors active:scale-[0.97]"
+            >
+              Messenger
+            </a>
           </div>
-
-          {/* Messenger */}
-          <a
-            href={`fb-messenger://share/?link=${encodeURIComponent(shareUrl)}`}
-            className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-[#0084FF]/10 text-[#0084FF] border border-[#0084FF]/20 rounded-xl text-sm font-medium hover:bg-[#0084FF]/20 transition-colors mb-5"
-          >
-            Messenger
-          </a>
 
           {/* QR kod */}
           {qrDataUrl && (
@@ -448,14 +447,14 @@ function ShareModal({ slug, listName, onClose }: { slug: string; listName: strin
                 QR kod za pozivnicu
               </p>
               <div className="inline-block bg-cream p-3 rounded-2xl border border-blush/30">
-                <img src={qrDataUrl} alt="QR kod za listu" className="w-48 h-48" />
+                <img src={qrDataUrl} alt="QR kod za listu" className="w-40 h-40 sm:w-48 sm:h-48" />
               </div>
               <p className="text-xs text-warm-gray/60 mt-2 mb-3">
                 Skeniraj ili stavi na baby shower pozivnicu
               </p>
               <button
                 onClick={downloadQR}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-cream border border-blush/40 rounded-full text-xs font-medium text-charcoal hover:bg-blush/30 transition-colors"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-cream border border-blush/40 rounded-full text-xs font-medium text-charcoal hover:bg-blush/30 transition-colors active:scale-[0.97]"
               >
                 <Download size={12} />
                 Preuzmi QR kod
@@ -504,30 +503,30 @@ function NewListModal({ onClose, onCreate }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-charcoal/30 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl fade-up max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-charcoal/30 backdrop-blur-sm">
+      <div className="bg-white sm:rounded-3xl rounded-t-3xl w-full sm:max-w-md p-5 sm:p-6 shadow-2xl fade-up max-h-[100dvh] sm:max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-5">
           <h3 className="font-serif text-xl">Nova lista</h3>
-          <button onClick={onClose} className="p-1.5 hover:bg-cream rounded-full transition-colors">
-            <X size={18} className="text-warm-gray" />
+          <button onClick={onClose} className="p-2 hover:bg-cream rounded-full transition-colors -mr-1">
+            <X size={20} className="text-warm-gray" />
           </button>
         </div>
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-medium text-warm-gray mb-1.5 uppercase tracking-wide">Naziv liste *</label>
             <input type="text" placeholder='npr. "Lista za Mateja"' value={name} onChange={e => setName(e.target.value)}
-              className="w-full px-4 py-3 bg-cream border border-blush/40 rounded-xl text-sm focus:outline-none focus:border-rose" autoFocus />
+              className="w-full px-4 py-3 bg-cream border border-blush/40 rounded-xl text-sm text-base-mobile focus:outline-none focus:border-rose" autoFocus />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-warm-gray mb-2 uppercase tracking-wide">Za sto je lista?</label>
+            <label className="block text-xs font-medium text-warm-gray mb-2 uppercase tracking-wide">Za što je lista?</label>
             <div className="grid grid-cols-2 gap-2">
               {OCCASIONS.map(o => (
                 <button key={o.value} type="button"
                   onClick={() => { setOccasion(oc => oc === o.value ? '' : o.value); setDateInput(''); setBabyGender('') }}
-                  className={clsx('flex items-center gap-2 px-3 py-3 rounded-xl text-sm font-medium border transition-all',
+                  className={clsx('flex items-center gap-2 px-3 py-3 rounded-xl text-sm font-medium border transition-all active:scale-[0.97]',
                     occasion === o.value ? 'border-rose bg-blush/30 text-charcoal' : 'border-blush/40 text-warm-gray hover:border-blush-mid')}>
-                  <span className="text-xl" dangerouslySetInnerHTML={{ __html: o.emoji }}></span> {o.label}
+                  <span className="text-xl">{o.emoji}</span> {o.label}
                 </button>
               ))}
             </div>
@@ -541,12 +540,12 @@ function NewListModal({ onClose, onCreate }: {
               </label>
               <div className="relative">
                 <input type="text" placeholder="15/06/2025" value={dateInput} onChange={handleDateInput} maxLength={10}
-                  className="w-full px-4 py-3 bg-cream border border-blush/40 rounded-xl text-sm focus:outline-none focus:border-rose font-mono tracking-wider" />
+                  className="w-full px-4 py-3 bg-cream border border-blush/40 rounded-xl text-sm text-base-mobile focus:outline-none focus:border-rose font-mono tracking-wider" />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-warm-gray/50">dd/mm/yyyy</span>
               </div>
               {dateError && <p className="text-xs text-rose mt-1">{dateError}</p>}
               {dateInput.length === 10 && parseDMY(dateInput) && (
-                <p className="text-xs text-sage mt-1">&#x2713; {parseDMY(dateInput)?.toLocaleDateString('hr-HR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                <p className="text-xs text-sage mt-1">✓ {parseDMY(dateInput)?.toLocaleDateString('hr-HR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
               )}
             </div>
           )}
@@ -555,12 +554,12 @@ function NewListModal({ onClose, onCreate }: {
             <div>
               <label className="block text-xs font-medium text-warm-gray mb-2 uppercase tracking-wide">Spol bebe</label>
               <div className="grid grid-cols-3 gap-2">
-                {[{ value: 'boy', emoji: '&#x1F499;', label: 'Djecak' }, { value: 'girl', emoji: '&#x1F497;', label: 'Djevojcica' }, { value: 'surprise', emoji: '&#x1F380;', label: 'Iznenadjenje' }].map(opt => (
+                {[{ value: 'boy', emoji: '💙', label: 'Dječak' }, { value: 'girl', emoji: '💗', label: 'Djevojčica' }, { value: 'surprise', emoji: '🎀', label: 'Iznenađenje' }].map(opt => (
                   <button key={opt.value} type="button"
                     onClick={() => setBabyGender(g => g === opt.value ? '' : opt.value)}
-                    className={clsx('flex flex-col items-center gap-1 py-2.5 rounded-xl text-xs font-medium border transition-all',
+                    className={clsx('flex flex-col items-center gap-1 py-2.5 rounded-xl text-xs font-medium border transition-all active:scale-[0.97]',
                       babyGender === opt.value ? 'border-rose bg-blush/30' : 'border-blush/40 text-warm-gray hover:border-blush-mid')}>
-                    <span className="text-lg" dangerouslySetInnerHTML={{ __html: opt.emoji }}></span> {opt.label}
+                    <span className="text-lg">{opt.emoji}</span> {opt.label}
                   </button>
                 ))}
               </div>
@@ -569,7 +568,7 @@ function NewListModal({ onClose, onCreate }: {
         </div>
 
         <button onClick={handleSubmit} disabled={!name.trim() || loading}
-          className="w-full mt-5 py-3 bg-rose text-white font-medium rounded-full hover:bg-rose/90 transition-colors disabled:opacity-50">
+          className="w-full mt-5 py-3 bg-rose text-white font-medium rounded-full hover:bg-rose/90 transition-colors disabled:opacity-50 active:scale-[0.97]">
           {loading ? 'Kreiram...' : 'Kreiraj listu'}
         </button>
       </div>
@@ -658,7 +657,7 @@ export default function MojaListaPage() {
       <>
         <Navbar />
         <main className="min-h-screen pt-20 flex items-center justify-center">
-          <div className="text-center"><span className="text-4xl animate-bounce block mb-4">&#x1F37C;</span><p className="text-warm-gray">Ucitavanje...</p></div>
+          <div className="text-center"><span className="text-4xl animate-bounce block mb-4">🍼</span><p className="text-warm-gray">Učitavanje...</p></div>
         </main>
       </>
     )
@@ -668,24 +667,24 @@ export default function MojaListaPage() {
     <>
       <Navbar />
       <main className="min-h-screen pt-20 pb-16">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6">
-          <div className="py-8 flex items-end justify-between gap-4">
-            <div>
-              <h1 className="font-serif text-3xl text-charcoal">Hej, {user?.name?.split(' ')[0]}! &#x1F44B;</h1>
-              <p className="text-warm-gray mt-1">{lists.length === 0 ? 'Kreiraj svoju prvu listu' : `Imas ${lists.length} ${lists.length === 1 ? 'listu' : 'liste'}`}</p>
+        <div className="max-w-4xl mx-auto px-3 sm:px-6">
+          <div className="py-6 sm:py-8 flex items-end justify-between gap-3 sm:gap-4">
+            <div className="min-w-0">
+              <h1 className="font-serif text-2xl sm:text-3xl text-charcoal truncate">Hej, {user?.name?.split(' ')[0]}! 👋</h1>
+              <p className="text-warm-gray text-sm mt-1">{lists.length === 0 ? 'Kreiraj svoju prvu listu' : `Imaš ${lists.length} ${lists.length === 1 ? 'listu' : 'liste'}`}</p>
             </div>
             <button onClick={() => setShowNewModal(true)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-rose text-white text-sm font-medium rounded-full hover:bg-rose/90 transition-colors flex-shrink-0">
-              <Plus size={16} /> Nova lista
+              className="flex items-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-2.5 bg-rose text-white text-sm font-medium rounded-full hover:bg-rose/90 transition-colors flex-shrink-0 active:scale-[0.97]">
+              <Plus size={16} /> <span className="hidden sm:inline">Nova</span> lista
             </button>
           </div>
 
           {lists.length === 0 && (
-            <div className="text-center py-20 bg-white rounded-3xl border border-blush/30">
-              <span className="text-6xl block mb-4">&#x1F49D;</span>
-              <h3 className="font-serif text-2xl text-charcoal mb-3">Tvoja prva lista te ceka</h3>
+            <div className="text-center py-16 sm:py-20 bg-white rounded-3xl border border-blush/30 px-6">
+              <span className="text-5xl sm:text-6xl block mb-4">💝</span>
+              <h3 className="font-serif text-xl sm:text-2xl text-charcoal mb-3">Tvoja prva lista te čeka</h3>
               <p className="text-warm-gray mb-8 max-w-sm mx-auto text-sm">Kreiraj listu, dodaj proizvode i podijeli je s obitelji i prijateljima</p>
-              <button onClick={() => setShowNewModal(true)} className="px-6 py-3 bg-rose text-white font-medium rounded-full hover:bg-rose/90 transition-colors">Kreiraj listu</button>
+              <button onClick={() => setShowNewModal(true)} className="px-6 py-3 bg-rose text-white font-medium rounded-full hover:bg-rose/90 transition-colors active:scale-[0.97]">Kreiraj listu</button>
             </div>
           )}
 
@@ -698,10 +697,10 @@ export default function MojaListaPage() {
 
               return (
                 <div key={list.id} className="bg-white rounded-3xl border border-blush/30 overflow-hidden">
-                  <div className="p-5 flex items-center gap-3">
+                  <div className="p-4 sm:p-5 flex items-center gap-2 sm:gap-3">
                     <button onClick={() => setExpandedList(isExpanded ? null : list.id)}
-                      className="w-10 h-10 bg-blush/40 rounded-2xl flex items-center justify-center flex-shrink-0">
-                      <span className="text-lg" dangerouslySetInnerHTML={{ __html: occ ? occ.emoji : '&#x1F49D;' }}></span>
+                      className="w-9 h-9 sm:w-10 sm:h-10 bg-blush/40 rounded-xl sm:rounded-2xl flex items-center justify-center flex-shrink-0">
+                      <span className="text-base sm:text-lg">{occ ? occ.emoji : '💝'}</span>
                     </button>
 
                     <div className="flex-1 min-w-0">
@@ -710,19 +709,19 @@ export default function MojaListaPage() {
                         onSave={(newName) => handleRenameList(list.id, newName)}
                       />
                       <p className="text-xs text-warm-gray mt-0.5">
-                        {totalCount} stavki &#xB7; {reservedCount} rezervirano
-                        {occ && <span className="ml-2 px-1.5 py-0.5 bg-blush/30 text-rose rounded-full text-xs">{occ.label}</span>}
+                        {totalCount} stavki · {reservedCount} rez.
+                        {occ && <span className="ml-1.5 px-1.5 py-0.5 bg-blush/30 text-rose rounded-full text-xs hidden sm:inline">{occ.label}</span>}
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                       <button onClick={() => setShareModal({ slug: list.shareSlug, name: list.name })}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-sage bg-sage-light/50 rounded-full hover:bg-sage-light transition-colors">
+                        className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-medium text-sage bg-sage-light/50 rounded-full hover:bg-sage-light transition-colors active:scale-[0.97]">
                         <Share2 size={12} />
-                        Dijeli
+                        <span className="hidden sm:inline">Dijeli</span>
                       </button>
                       <button onClick={() => handleDeleteList(list.id)} className="p-1.5 text-warm-gray hover:text-rose transition-colors">
-                        <Trash2 size={16} />
+                        <Trash2 size={15} />
                       </button>
                       <button onClick={() => setExpandedList(isExpanded ? null : list.id)} className="p-1.5 text-warm-gray">
                         {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -731,17 +730,17 @@ export default function MojaListaPage() {
                   </div>
 
                   {isExpanded && (
-                    <div className="border-t border-blush/20 p-4 space-y-2">
+                    <div className="border-t border-blush/20 p-3 sm:p-4 space-y-2">
                       {list.items?.length === 0 ? (
                         <div className="text-center py-8">
                           <p className="text-warm-gray text-sm mb-3">Lista je prazna</p>
-                          <div className="flex items-center justify-center gap-2">
-                            <a href="/katalog" className="inline-flex items-center gap-2 px-4 py-2 bg-blush/40 text-charcoal text-sm rounded-full hover:bg-blush transition-colors">
+                          <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
+                            <a href="/katalog" className="inline-flex items-center gap-2 px-4 py-2.5 bg-blush/40 text-charcoal text-sm rounded-full hover:bg-blush transition-colors w-full sm:w-auto justify-center">
                               <ShoppingBag size={14} /> Dodaj iz kataloga
                             </a>
                             <button
                               onClick={() => setSmartPasteListId(list.id)}
-                              className="inline-flex items-center gap-2 px-4 py-2 bg-sage-light/60 text-sage text-sm rounded-full hover:bg-sage-light transition-colors"
+                              className="inline-flex items-center gap-2 px-4 py-2.5 bg-sage-light/60 text-sage text-sm rounded-full hover:bg-sage-light transition-colors w-full sm:w-auto justify-center"
                             >
                               <LinkIcon size={14} /> Dodaj s linka
                             </button>
@@ -755,22 +754,22 @@ export default function MojaListaPage() {
                               onDelete={id => handleDeleteItem(list.id, id)}
                               onPriorityChange={(id, p) => handlePriorityChange(list.id, id, p)} />
                           ))}
-                          <div className="flex gap-2 mt-1">
+                          <div className="flex flex-col sm:flex-row gap-2 mt-1">
                             <a href="/katalog" className="flex items-center justify-center gap-2 flex-1 py-3 border-2 border-dashed border-blush/40 rounded-2xl text-sm text-warm-gray hover:border-blush-mid hover:text-charcoal transition-colors">
-                              <Plus size={14} /> Dodaj iz kataloga
+                              <Plus size={14} /> Iz kataloga
                             </a>
                             <button
                               onClick={() => setSmartPasteListId(list.id)}
                               className="flex items-center justify-center gap-2 flex-1 py-3 border-2 border-dashed border-sage/30 rounded-2xl text-sm text-sage hover:border-sage hover:text-sage/80 transition-colors"
                             >
-                              <LinkIcon size={14} /> Dodaj s linka &#x1F517;
+                              <LinkIcon size={14} /> S linka
                             </button>
                           </div>
                         </>
                       )}
                       <div className="pt-2 border-t border-blush/20 flex items-center justify-between">
-                        <p className="text-xs text-warm-gray font-mono">/lista/{list.shareSlug.substring(0, 10)}...</p>
-                        <a href={`/lista/${list.shareSlug}`} target="_blank" className="flex items-center gap-1 text-xs text-sage hover:underline">
+                        <p className="text-xs text-warm-gray font-mono truncate max-w-[150px] sm:max-w-none">/lista/{list.shareSlug.substring(0, 10)}...</p>
+                        <a href={`/lista/${list.shareSlug}`} target="_blank" className="flex items-center gap-1 text-xs text-sage hover:underline flex-shrink-0">
                           Pregled <ExternalLink size={10} />
                         </a>
                       </div>
@@ -794,7 +793,7 @@ export default function MojaListaPage() {
       )}
 
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 bg-charcoal text-white text-sm rounded-full shadow-2xl fade-in">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-charcoal text-white text-sm rounded-full shadow-2xl fade-in whitespace-nowrap">
           {toast}
         </div>
       )}

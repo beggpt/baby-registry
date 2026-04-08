@@ -87,3 +87,23 @@ h1, h2, h3, h4 {
 .status-available { background: #EAF4EA; color: #3D7A3A; }
 .status-reserved  { background: #FEF3E2; color: #9A6B1A; }
 .status-purchased { background: #EAE8F4; color: #5A4E8A; }
+
+/* Mobile: prevent iOS zoom on input focus */
+@media (max-width: 640px) {
+  .text-base-mobile { font-size: 16px !important; }
+}
+
+/* Safe area for phones with notch/home indicator */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .fixed.bottom-0,
+  .fixed.inset-0 .pb-5,
+  .fixed.inset-0 .pb-6 {
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+  }
+}
+
+/* Smooth touch feedback */
+@media (hover: none) {
+  .active\:scale-\[0\.97\]:active { transform: scale(0.97); }
+  .active\:scale-\[0\.98\]:active { transform: scale(0.98); }
+}
