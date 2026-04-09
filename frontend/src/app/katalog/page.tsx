@@ -101,7 +101,8 @@ export default function KatalogPage() {
 
   const [query, setQuery] = useState(searchParams.get('q') || '')
   const [categorySlug, setCategorySlug] = useState(searchParams.get('kategorija') || '')
-  const [sortBy, setSortBy] = useState('name')
+  const [sortBy, setSortBy] = useState('price_asc')
+  const [shopSlug, setShopSlug] = useState('')
   const [page, setPage] = useState(1)
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
@@ -116,6 +117,7 @@ export default function KatalogPage() {
       const res = await productsApi.getAll({
         q: query || undefined,
         categorySlug: categorySlug || undefined,
+        shopSlug: shopSlug || undefined,
         sortBy, page, limit: 24,
         minPrice: minPrice ? parseFloat(minPrice) : undefined,
         maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
@@ -124,7 +126,7 @@ export default function KatalogPage() {
       setPagination(res.data.pagination)
       if (res.data.priceRange) setPriceRange(res.data.priceRange)
     } catch {} finally { setLoading(false) }
-  }, [query, categorySlug, sortBy, page, minPrice, maxPrice])
+  }, [query, categorySlug, shopSlug, sortBy, page, minPrice, maxPrice])
 
   useEffect(() => { fetchProducts() }, [fetchProducts])
   useEffect(() => { productsApi.getCategories().then(res => setCategories(res.data)).catch(() => {}) }, [])
@@ -235,6 +237,27 @@ export default function KatalogPage() {
           </button>
         )}
       </div>
+
+      <div>
+        <h3 className="text-xs font-medium text-warm-gray uppercase tracking-wide mb-3">Dućan</h3>
+        <div className="space-y-0.5">
+          <button onClick={() => { setShopSlug(''); setPage(1) }}
+            className={clsx('w-full text-left px-3 py-2 rounded-xl text-sm transition-colors',
+              !shopSlug ? 'bg-blush/50 text-rose font-medium' : 'text-warm-gray hover:bg-cream')}>
+            Svi dućani
+          </button>
+          {[
+            { slug: 'babycenter', name: 'Baby Center' },
+            { slug: 'svijetbeba', name: 'Svijet Beba' },
+          ].map(shop => (
+            <button key={shop.slug} onClick={() => { setShopSlug(shopSlug === shop.slug ? '' : shop.slug); setPage(1) }}
+              className={clsx('w-full text-left px-3 py-2 rounded-xl text-sm transition-colors',
+                shopSlug === shop.slug ? 'bg-blush/50 text-rose font-medium' : 'text-charcoal hover:bg-cream')}>
+              {shop.name}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   )
 
@@ -300,7 +323,7 @@ export default function KatalogPage() {
                   <span className="text-5xl block mb-4">🔍</span>
                   <h3 className="font-serif text-xl text-charcoal mb-2">Nema rezultata</h3>
                   <p className="text-warm-gray text-sm mb-4">Pokušaj s drugačijim filterima</p>
-                  <button onClick={() => { setQuery(''); setCategorySlug(''); setMinPrice(''); setMaxPrice(''); setPage(1) }}
+                  <button onClick={() => { setQuery(''); setCategorySlug(''); setShopSlug(''); setMinPrice(''); setMaxPrice(''); setPage(1) }}
                     className="px-5 py-2 bg-blush/40 text-charcoal rounded-full text-sm hover:bg-blush transition-colors">
                     Resetiraj filtere
                   </button>

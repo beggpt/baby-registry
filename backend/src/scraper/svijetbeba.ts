@@ -101,24 +101,55 @@ function scrapeProducts($: cheerio.CheerioAPI): ScrapedProduct[] {
     try {
       const $el = $(el)
 
-      // Link and name
-      const $link = $el.find('a[href^="/"]').first()
+      // Link - product URLs contain /41/ pattern
+      const $link = $el.find('a[href*="/41/"]').first()
       let productUrl = $link.attr('href') || ''
-      if (!productUrl) return
+      if (!productUrl) {
+        // Fallback: any link that's not #
+        const $anyLink = $el.find('a[href^="/"]').not('a[href="#"]').first()
+        productUrl = $anyLink.attr('href') || ''
+      }
+      if (!productUrl || productUrl === '#') return
       if (productUrl.startsWith('/')) productUrl = BASE_URL + productUrl
       if (seen.has(productUrl)) return
       seen.add(productUrl)
 
-      const $title = $el.find('h2').first()
-      const name = $title.text().trim() || $link.text().trim()
+      // Name: best source is img alt, then link text (cleaned of price/discount text)
+      const $img = $el.find('img').first()
+      const altText = ($img.attr('alt') || '').trim()
+
+      // Link text often contains the product name too
+      const linkText = $link.text().trim()
+
+      // Clean name: remove discount patterns like "-10%", "-15%", price patterns
+      const cleanName = (text: string) => {
+        return text
+          .replace(/-?\d+%/g, '')           // remove -10%, -15% etc
+          .replace(/\d+[,.]\d+\s*€/g, '')  // remove prices like 21,99 €
+          .replace(/Dodaj u košaricu/gi, '') // remove button text
+          .replace(/\s+/g, ' ')
+          .trim()
+      }
+
+      const name = cleanName(altText) || cleanName(linkText)
       if (!name || name.length < 3) return
 
-      // Price
-      const $price = $el.find('.price').first()
-      const price = parseHRPrice($price.text())
+      // Price: look for text matching price pattern within the article
+      let price = 0
+      const priceText = $el.find('.price').first().text().trim()
+      if (priceText) {
+        price = parseHRPrice(priceText)
+      }
+      // Fallback: find any text matching price pattern
+      if (price <= 0) {
+        const allText = $el.text()
+        const priceMatch = allText.match(/(\d+[,.]\d{2})\s*€/)
+        if (priceMatch) {
+          price = parseHRPrice(priceMatch[0])
+        }
+      }
 
-      // Image
-      const $img = $el.find('img').first()
+      // Image: use src or data-src, prefix with base URL
       let imageUrl = $img.attr('data-src') || $img.attr('src') || ''
       if (imageUrl.startsWith('/')) imageUrl = BASE_URL + imageUrl
       if (imageUrl.startsWith('//')) imageUrl = 'https:' + imageUrl
