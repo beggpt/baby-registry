@@ -27,8 +27,8 @@ function ReserveChoiceModal({
   }).format(product.price)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-charcoal/40 backdrop-blur-sm fade-in">
-      <div className="bg-white sm:rounded-3xl rounded-t-3xl w-full sm:max-w-md shadow-2xl overflow-hidden fade-up max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center pt-4 sm:pt-0 sm:p-4 bg-charcoal/40 backdrop-blur-sm fade-in">
+      <div className="bg-white rounded-3xl w-full sm:max-w-md shadow-2xl overflow-hidden fade-up max-h-[90vh] overflow-y-auto">
         <div className="p-5 sm:p-6">
           <div className="flex justify-between items-start mb-5">
             <h3 className="font-serif text-xl text-charcoal">Kako želiš kupiti?</h3>
@@ -123,8 +123,8 @@ function ReserveModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-charcoal/40 backdrop-blur-sm fade-in">
-      <div className="bg-white sm:rounded-3xl rounded-t-3xl w-full sm:max-w-md shadow-2xl overflow-hidden fade-up max-h-[100dvh] sm:max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center pt-4 sm:pt-0 sm:p-4 bg-charcoal/40 backdrop-blur-sm fade-in">
+      <div className="bg-white rounded-3xl w-full sm:max-w-md shadow-2xl overflow-hidden fade-up max-h-[100dvh] sm:max-h-[90vh] overflow-y-auto">
         {step === 'form' ? (
           <>
             <div className="p-5 sm:p-6">
@@ -163,7 +163,6 @@ function ReserveModal({
                     onChange={e => setName(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleSubmit()}
                     className="w-full px-4 py-3 bg-cream border border-blush/40 rounded-xl text-sm text-base-mobile focus:outline-none focus:border-blush-mid transition-colors"
-                    autoFocus
                   />
                   <p className="text-xs text-warm-gray/60 mt-1.5">
                     Mama će vidjeti tko je rezervirao ovaj poklon
@@ -304,8 +303,8 @@ function GroupBuyModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-charcoal/40 backdrop-blur-sm fade-in">
-      <div className="bg-white sm:rounded-3xl rounded-t-3xl w-full sm:max-w-md shadow-2xl overflow-hidden fade-up max-h-[100dvh] sm:max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center pt-4 sm:pt-0 sm:p-4 bg-charcoal/40 backdrop-blur-sm fade-in">
+      <div className="bg-white rounded-3xl w-full sm:max-w-md shadow-2xl overflow-hidden fade-up max-h-[100dvh] sm:max-h-[90vh] overflow-y-auto">
         {step === 'form' ? (
           <>
             <div className="p-5 sm:p-6">
@@ -345,7 +344,6 @@ function GroupBuyModal({
                     value={name}
                     onChange={e => setName(e.target.value)}
                     className="w-full px-4 py-3 bg-cream border border-blush/40 rounded-xl text-sm text-base-mobile focus:outline-none focus:border-blush-mid transition-colors"
-                    autoFocus
                   />
                 </div>
 
