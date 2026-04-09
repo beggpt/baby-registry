@@ -86,8 +86,8 @@ function SmartPasteModal({ listId, onClose, onSuccess }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-charcoal/30 backdrop-blur-sm">
-      <div className="bg-white sm:rounded-3xl rounded-t-3xl w-full sm:max-w-md p-5 sm:p-6 shadow-2xl fade-up max-h-[100dvh] sm:max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center pt-4 sm:pt-0 sm:p-4 bg-charcoal/30 backdrop-blur-sm">
+      <div className="bg-white rounded-3xl w-full sm:max-w-md p-5 sm:p-6 shadow-2xl fade-up max-h-[100dvh] sm:max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-5">
           <h3 className="font-serif text-xl">Dodaj s linka 🔗</h3>
           <button onClick={onClose} className="p-2 hover:bg-cream rounded-full transition-colors -mr-1">
@@ -107,7 +107,6 @@ function SmartPasteModal({ listId, onClose, onSuccess }: {
               onPaste={handlePaste}
               onKeyDown={e => e.key === 'Enter' && handleFetch()}
               className="flex-1 px-4 py-3 bg-cream border border-blush/40 rounded-xl text-sm text-base-mobile focus:outline-none focus:border-rose min-w-0"
-              autoFocus
             />
             <button
               onClick={handleFetch}
@@ -330,7 +329,6 @@ function EditableListName({ name, onSave }: { name: string; onSave: (newName: st
           onChange={e => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={handleSave}
-          autoFocus
           className="flex-1 text-sm font-medium text-charcoal bg-cream border border-rose/40 rounded-lg px-2 py-1 focus:outline-none min-w-0"
         />
         <button onClick={handleSave} disabled={saving} className="text-sage hover:text-sage/80 transition-colors flex-shrink-0">
@@ -389,8 +387,8 @@ function ShareModal({ slug, listName, onClose }: { slug: string; listName: strin
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-charcoal/40 backdrop-blur-sm fade-in">
-      <div className="bg-white sm:rounded-3xl rounded-t-3xl w-full sm:max-w-md shadow-2xl overflow-hidden fade-up max-h-[100dvh] sm:max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center pt-4 sm:pt-0 sm:p-4 bg-charcoal/40 backdrop-blur-sm fade-in">
+      <div className="bg-white rounded-3xl w-full sm:max-w-md shadow-2xl overflow-hidden fade-up max-h-[100dvh] sm:max-h-[90vh] overflow-y-auto">
         <div className="p-5 sm:p-6">
           <div className="flex justify-between items-start mb-5">
             <h3 className="font-serif text-xl text-charcoal">Podijeli listu</h3>
@@ -421,18 +419,21 @@ function ShareModal({ slug, listName, onClose }: { slug: string; listName: strin
               href={`https://wa.me/?text=${encodeURIComponent(shareText + '\n' + shareUrl)}`}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => setTimeout(onClose, 300)}
               className="flex items-center justify-center gap-1.5 px-3 py-3 bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/20 rounded-xl text-sm font-medium hover:bg-[#25D366]/20 transition-colors active:scale-[0.97]"
             >
               WhatsApp
             </a>
             <a
               href={`viber://forward?text=${encodeURIComponent(shareText + '\n' + shareUrl)}`}
+              onClick={() => setTimeout(onClose, 300)}
               className="flex items-center justify-center gap-1.5 px-3 py-3 bg-[#7360F2]/10 text-[#7360F2] border border-[#7360F2]/20 rounded-xl text-sm font-medium hover:bg-[#7360F2]/20 transition-colors active:scale-[0.97]"
             >
               Viber
             </a>
             <a
               href={`fb-messenger://share/?link=${encodeURIComponent(shareUrl)}`}
+              onClick={() => setTimeout(onClose, 300)}
               className="flex items-center justify-center gap-1.5 px-3 py-3 bg-[#0084FF]/10 text-[#0084FF] border border-[#0084FF]/20 rounded-xl text-sm font-medium hover:bg-[#0084FF]/20 transition-colors active:scale-[0.97]"
             >
               Messenger
@@ -503,8 +504,8 @@ function NewListModal({ onClose, onCreate }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-charcoal/30 backdrop-blur-sm">
-      <div className="bg-white sm:rounded-3xl rounded-t-3xl w-full sm:max-w-md p-5 sm:p-6 shadow-2xl fade-up max-h-[100dvh] sm:max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center pt-4 sm:pt-0 sm:p-4 bg-charcoal/30 backdrop-blur-sm">
+      <div className="bg-white rounded-3xl w-full sm:max-w-md p-5 sm:p-6 shadow-2xl fade-up max-h-[100dvh] sm:max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-5">
           <h3 className="font-serif text-xl">Nova lista</h3>
           <button onClick={onClose} className="p-2 hover:bg-cream rounded-full transition-colors -mr-1">
@@ -515,7 +516,7 @@ function NewListModal({ onClose, onCreate }: {
           <div>
             <label className="block text-xs font-medium text-warm-gray mb-1.5 uppercase tracking-wide">Naziv liste *</label>
             <input type="text" placeholder='npr. "Lista za Mateja"' value={name} onChange={e => setName(e.target.value)}
-              className="w-full px-4 py-3 bg-cream border border-blush/40 rounded-xl text-sm text-base-mobile focus:outline-none focus:border-rose" autoFocus />
+              className="w-full px-4 py-3 bg-cream border border-blush/40 rounded-xl text-sm text-base-mobile focus:outline-none focus:border-rose" />
           </div>
 
           <div>

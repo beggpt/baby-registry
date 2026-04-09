@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { prisma } from '../utils/prisma'
 import { runBabyCenterScraper } from '../scraper/babycenter'
+import { runSvijetBebaScraper } from '../scraper/svijetbeba'
 
 export const adminRouter = Router()
 
@@ -106,6 +107,7 @@ adminRouter.post('/shops/:slug/scrape', async (req, res) => {
   const { slug } = req.params
   res.json({ message: `Scraping pokrenut za ${slug}.` })
   if (slug === 'babycenter') runBabyCenterScraper().catch(console.error)
+  else if (slug === 'svijetbeba') runSvijetBebaScraper().catch(console.error)
 })
 
 // GET /api/admin/featured
