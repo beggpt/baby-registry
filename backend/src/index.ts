@@ -7,6 +7,7 @@ import { productsRouter } from './routes/products'
 import { publicRouter } from './routes/public'
 import { adminRouter } from './routes/admin'
 import { scheduleScraper } from './scraper/scheduler'
+import { prisma } from './utils/prisma'
 
 dotenv.config()
 
@@ -45,7 +46,20 @@ app.post('/api/run-scraper', async (_, res) => {
   runBabyCenterScraper().catch(console.error)
 })
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 Baby Registry API na http://localhost:${PORT}`)
   scheduleScraper()
+
+  // Ensure all shops exist in DB so they show in admin panel
+  const shops = [
+    { name: 'Baby Center', slug: 'babycenter', baseUrl: 'https://www.babycenter.hr' },
+    { name: 'Svijet Beba', slug: 'svijetbeba', baseUrl: 'https://www.svijet-beba.hr' },
+  ]
+  for (const shop of shops) {
+    await prisma.scrapedShop.upsert({
+      where: { slug: shop.slug },
+      create: { ...shop, isActive: true },
+      update: {},
+    }).catch(() => {})
+  }
 })
