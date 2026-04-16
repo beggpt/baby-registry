@@ -47,6 +47,7 @@ function ReserveChoiceModal({
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium text-charcoal line-clamp-2 leading-snug">{product.name}</p>
+              {item.note && <p className="text-xs text-warm-gray mt-0.5">📝 {item.note}</p>}
               <p className="text-sm text-rose font-medium mt-0.5">{formattedPrice}</p>
             </div>
           </div>
@@ -145,6 +146,7 @@ function ReserveModal({
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-charcoal line-clamp-2 leading-snug">{product.name}</p>
+                  {item.note && <p className="text-xs text-warm-gray mt-0.5">📝 {item.note}</p>}
                   <p className="text-sm text-rose font-medium mt-0.5">{formattedPrice}</p>
                   <p className="text-xs text-warm-gray">{product.shopName}</p>
                 </div>
@@ -327,6 +329,7 @@ function GroupBuyModal({
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-charcoal line-clamp-2 leading-snug">{product.name}</p>
+                  {item.note && <p className="text-xs text-warm-gray mt-0.5">📝 {item.note}</p>}
                   <p className="text-sm text-rose font-medium mt-0.5">{formattedPrice}</p>
                 </div>
               </div>
@@ -564,6 +567,9 @@ function PublicListItem({ item, onReserve, onGroupBuy, onJoinGroup }: {
         >
           {product.name}
         </p>
+        {item.note && (
+          <span className="inline-block mt-1 text-xs px-2 py-0.5 bg-blush/30 text-charcoal/80 rounded-full font-medium">📝 {item.note}</span>
+        )}
         <div className="flex items-center gap-2 mt-1 flex-wrap">
           <span className="text-sm font-medium text-rose">{formattedPrice}</span>
           <span className="text-xs text-warm-gray/50">·</span>

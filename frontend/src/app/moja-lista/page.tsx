@@ -174,13 +174,26 @@ function SmartPasteModal({ listId, onClose, onSuccess }: {
 }
 
 // Stavka liste - div umjesto <a> da select/button rade ispravno
-function ListItemRow({ item, listId, onDelete, onPriorityChange }: {
+function ListItemRow({ item, listId, onDelete, onPriorityChange, onNoteChange }: {
   item: ListItem; listId: string
   onDelete: (id: string) => void
   onPriorityChange: (id: string, p: Priority) => void
+  onNoteChange: (id: string, note: string) => void
 }) {
   const [deleting, setDeleting] = useState(false)
+  const [editingNote, setEditingNote] = useState(false)
+  const [noteValue, setNoteValue] = useState(item.note || '')
+  const [savingNote, setSavingNote] = useState(false)
   const { product, reservation } = item
+
+  const handleNoteSave = async () => {
+    const trimmed = noteValue.trim()
+    if (trimmed === (item.note || '')) { setEditingNote(false); return }
+    setSavingNote(true)
+    await onNoteChange(item.id, trimmed)
+    setSavingNote(false)
+    setEditingNote(false)
+  }
   const price = new Intl.NumberFormat('hr-HR', { style: 'currency', currency: product.currency || 'EUR' }).format(product.price)
   const shopUrl = addRefToUrl(product.productUrl)
 
@@ -246,6 +259,41 @@ function ListItemRow({ item, listId, onDelete, onPriorityChange }: {
             : <span className="text-xs px-2 py-0.5 status-available rounded-full">✓ Slobodno</span>
           }
         </div>
+
+        {/* Napomena mame (veličina, boja, varijanta...) */}
+        {editingNote ? (
+          <div className="mt-2 flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+            <input
+              type="text"
+              value={noteValue}
+              onChange={e => setNoteValue(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleNoteSave(); if (e.key === 'Escape') { setEditingNote(false); setNoteValue(item.note || '') } }}
+              placeholder="npr. Vel. 38, plava boja..."
+              className="flex-1 text-xs px-2.5 py-1.5 bg-cream border border-blush/40 rounded-lg focus:outline-none focus:border-rose text-charcoal min-w-0"
+              style={{ fontSize: '16px' }}
+            />
+            <button onClick={handleNoteSave} disabled={savingNote} className="text-sage hover:text-sage/80 transition-colors flex-shrink-0 p-1">
+              {savingNote ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+            </button>
+            <button onClick={() => { setEditingNote(false); setNoteValue(item.note || '') }} className="text-warm-gray hover:text-rose transition-colors flex-shrink-0 p-1">
+              <X size={13} />
+            </button>
+          </div>
+        ) : item.note ? (
+          <div className="mt-1.5 flex items-center gap-1" onClick={e => e.stopPropagation()}>
+            <span className="text-xs px-2 py-0.5 bg-blush/30 text-charcoal/80 rounded-full font-medium">📝 {item.note}</span>
+            <button onClick={() => { setEditingNote(true); setNoteValue(item.note || '') }} className="text-warm-gray/40 hover:text-rose transition-colors p-0.5">
+              <Edit3 size={10} />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={e => { e.stopPropagation(); setEditingNote(true) }}
+            className="mt-1.5 text-xs text-warm-gray/50 hover:text-rose transition-colors flex items-center gap-1"
+          >
+            <Plus size={10} /> Dodaj napomenu
+          </button>
+        )}
 
         {/* Poruka od osobe koja je rezervirala */}
         {reservation?.note && !isGroupBuy && (
@@ -646,6 +694,14 @@ export default function MojaListaPage() {
     ))
   }
 
+  const handleNoteChange = async (listId: string, itemId: string, note: string) => {
+    await listsApi.updateItem(listId, itemId, { note: note || null })
+    setLists(prev => prev.map(l => l.id === listId
+      ? { ...l, items: l.items.map(i => i.id === itemId ? { ...i, note: note || undefined } : i) }
+      : l
+    ))
+  }
+
   const handleSmartPasteSuccess = (listId: string, item: ListItem) => {
     setLists(prev => prev.map(l => l.id === listId
       ? { ...l, items: [...l.items, item], _count: { items: (l._count?.items || 0) + 1 } }
@@ -756,7 +812,8 @@ export default function MojaListaPage() {
                           {list.items.map(item => (
                             <ListItemRow key={item.id} item={item} listId={list.id}
                               onDelete={id => handleDeleteItem(list.id, id)}
-                              onPriorityChange={(id, p) => handlePriorityChange(list.id, id, p)} />
+                              onPriorityChange={(id, p) => handlePriorityChange(list.id, id, p)}
+                              onNoteChange={(id, note) => handleNoteChange(list.id, id, note)} />
                           ))}
                           <div className="flex flex-col sm:flex-row gap-2 mt-1">
                             <a href="/katalog" className="flex items-center justify-center gap-2 flex-1 py-3 border-2 border-dashed border-blush/40 rounded-2xl text-sm text-warm-gray hover:border-blush-mid hover:text-charcoal transition-colors">
