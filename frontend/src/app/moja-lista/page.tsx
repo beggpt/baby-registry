@@ -27,7 +27,10 @@ const OCCASIONS = [
 function parseDMY(s: string): Date | null {
   const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
   if (!m) return null
-  const d = new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]))
+  const day = parseInt(m[1]), month = parseInt(m[2]), year = parseInt(m[3])
+  // Use UTC to avoid timezone shifting the date by -1 day
+  const d = new Date(Date.UTC(year, month - 1, day))
+  if (d.getUTCFullYear() !== year || d.getUTCMonth() !== month - 1 || d.getUTCDate() !== day) return null
   return isNaN(d.getTime()) ? null : d
 }
 

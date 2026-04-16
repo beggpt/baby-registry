@@ -39,7 +39,7 @@ authRouter.post('/register', async (req, res) => {
         email: data.email,
         passwordHash,
         name: data.name,
-        dueDate: data.dueDate ? new Date(data.dueDate) : null,
+        dueDate: data.dueDate ? new Date(data.dueDate.includes('T') ? data.dueDate : data.dueDate + 'T00:00:00.000Z') : null,
         babyGender: data.babyGender || null,
       },
       select: userSelect()
@@ -148,7 +148,7 @@ authRouter.patch('/profile', authMiddleware, async (req: AuthRequest, res) => {
       where: { id: req.userId! },
       data: {
         name: name || undefined,
-        dueDate: dueDate ? new Date(dueDate) : dueDate === '' ? null : undefined,
+        dueDate: dueDate ? new Date(dueDate.includes('T') ? dueDate : dueDate + 'T00:00:00.000Z') : dueDate === '' ? null : undefined,
         babyGender: babyGender || null,
       },
       select: userSelect()
